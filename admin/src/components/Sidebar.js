@@ -62,6 +62,13 @@ const BannersIcon = () => (
     </svg>
 );
 
+const CatalogIcon = () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M4 4h16v16H4z" />
+        <path d="M4 9h16M4 14h16M9 4v16M14 4v16" strokeOpacity="0.4" />
+    </svg>
+);
+
 const SettingsIcon = () => (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <circle cx="12" cy="12" r="3" />
@@ -85,6 +92,7 @@ const navItems = [
             { name: 'Customers', href: '/dashboard/customers', icon: CustomersIcon },
             { name: 'Discounts', href: '/dashboard/discounts', icon: DiscountsIcon },
             { name: 'Banners', href: '/dashboard/banners', icon: BannersIcon },
+            { name: 'Catalog', href: '/dashboard/catalog', icon: CatalogIcon },
         ]
     },
     {

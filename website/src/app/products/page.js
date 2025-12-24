@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import ProductCard from '@/components/ProductCard';
@@ -35,8 +35,10 @@ const allProducts = [
     { id: 12, name: 'Floral Print Chiffon Shawl', brand: 'Amrin Prints', price: 58, originalPrice: null, category: 'scarves', material: 'Chiffon', size: ['Standard'], image: null, isNew: true },
 ];
 
-const categories = ['All', 'Hijabs', 'Scarves', 'Instant Hijabs', 'Underscarves'];
-const materials = ['Chiffon', 'Jersey', 'Satin Silk', 'Modal', 'Cotton', 'Cashmere', 'Crepe', 'Voile'];
+// Default catalog data (fallback)
+const defaultCategories = ['All', 'Hijabs', 'Scarves', 'Instant Hijabs', 'Underscarves'];
+const defaultMaterials = ['Chiffon', 'Jersey', 'Satin Silk', 'Modal', 'Cotton', 'Cashmere', 'Crepe', 'Voile'];
+
 const priceRanges = [
     { label: 'All Prices', min: 0, max: Infinity },
     { label: 'Under RM30', min: 0, max: 30 },
@@ -52,11 +54,35 @@ const sortOptions = [
 ];
 
 export default function ProductsPage() {
+    const [categories, setCategories] = useState(defaultCategories);
+    const [materials, setMaterials] = useState(defaultMaterials);
     const [selectedCategory, setSelectedCategory] = useState('All');
     const [selectedSize, setSelectedSize] = useState(null);
     const [selectedPriceRange, setSelectedPriceRange] = useState(priceRanges[0]);
     const [sortBy, setSortBy] = useState('newest');
     const [showFilters, setShowFilters] = useState(true);
+
+    // Load dynamic catalog data from API
+    useEffect(() => {
+        async function fetchCatalog() {
+            try {
+                const res = await fetch('/api/catalog');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.categories) {
+                        setCategories(['All', ...data.categories.map(c => c.name)]);
+                    }
+                    if (data.fabrics) {
+                        setMaterials(data.fabrics);
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to fetch catalog:', error);
+                // Keep using defaults on error
+            }
+        }
+        fetchCatalog();
+    }, []);
 
     // Filter products
     let filteredProducts = allProducts.filter(product => {
