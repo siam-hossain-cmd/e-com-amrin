@@ -36,16 +36,53 @@ const ArrowIcon = () => (
   </svg>
 );
 
-// Sample products - Hijab & Scarf Collection
-const featuredProducts = [
-  { id: 1, name: 'Premium Chiffon Hijab', brand: 'Amrin Essentials', price: 45, originalPrice: 59, image: null, isNew: false },
-  { id: 2, name: 'Luxury Satin Silk Shawl', brand: 'Amrin Luxe', price: 89, originalPrice: null, image: null, isNew: true },
-  { id: 3, name: 'Jersey Instant Hijab', brand: 'Amrin Easy Wear', price: 35, originalPrice: 45, image: null, isNew: false },
-  { id: 4, name: 'Modal Cotton Underscarf', brand: 'Amrin Basics', price: 18, originalPrice: null, image: null, isNew: true },
-  { id: 5, name: 'Pashmina Cashmere Scarf', brand: 'Amrin Premium', price: 120, originalPrice: 150, image: null, isNew: false },
-  { id: 6, name: 'Pleated Chiffon Hijab', brand: 'Amrin Essentials', price: 55, originalPrice: null, image: null, isNew: true },
-  { id: 7, name: 'Printed Voile Square Scarf', brand: 'Amrin Prints', price: 42, originalPrice: 55, image: null, isNew: false },
-  { id: 8, name: 'Crepe Premium Hijab', brand: 'Amrin Luxe', price: 65, originalPrice: null, image: null, isNew: true },
+// Fetch hero settings
+async function getHeroSettings() {
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3001';
+    const res = await fetch(`${baseUrl}/api/settings/hero`, { next: { revalidate: 60 } });
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (error) {
+    console.error('Failed to fetch hero settings:', error);
+  }
+  return null;
+}
+
+// Fetch featured products
+async function getFeaturedProducts() {
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3001';
+    const res = await fetch(`${baseUrl}/api/products?limit=8`, { next: { revalidate: 60 } });
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (error) {
+    console.error('Failed to fetch products:', error);
+  }
+  return [];
+}
+
+// Default hero settings  
+const defaultHero = {
+  badge: 'NEW COLLECTION 2024',
+  title: 'Grace in Every',
+  titleHighlight: 'Wrap',
+  subtitle: 'Discover our curated collection of premium hijabs and scarves. Elegant fabrics, timeless styles, designed for the modern Muslimah.',
+  primaryButtonText: 'Shop Hijabs',
+  primaryButtonLink: '/products',
+  secondaryButtonText: 'VIEW LOOKBOOK',
+  secondaryButtonLink: '/products?collection=lookbook',
+  backgroundImage: null
+};
+
+// Fallback products
+const fallbackProducts = [
+  { _id: '1', name: 'Premium Chiffon Hijab', brand: 'Amrin Essentials', basePrice: 45, originalPrice: 59, image: null, isNew: false },
+  { _id: '2', name: 'Luxury Satin Silk Shawl', brand: 'Amrin Luxe', basePrice: 89, originalPrice: null, image: null, isNew: true },
+  { _id: '3', name: 'Jersey Instant Hijab', brand: 'Amrin Easy Wear', basePrice: 35, originalPrice: 45, image: null, isNew: false },
+  { _id: '4', name: 'Modal Cotton Underscarf', brand: 'Amrin Basics', basePrice: 18, originalPrice: null, image: null, isNew: true },
 ];
 
 const categories = [
@@ -55,34 +92,61 @@ const categories = [
   { name: 'Underscarves', count: 45, gradient: 'linear-gradient(135deg, #ece5dc, #d4c4b5)' },
 ];
 
-export default function HomePage() {
+export default async function HomePage() {
+  // Fetch data on server
+  const [heroData, productsData] = await Promise.all([
+    getHeroSettings(),
+    getFeaturedProducts()
+  ]);
+
+  const hero = heroData || defaultHero;
+  const products = productsData.length > 0 ? productsData : fallbackProducts;
+
+  // Transform products to match ProductCard expected format
+  const featuredProducts = products.map(p => ({
+    id: p._id,
+    name: p.name,
+    brand: p.brand,
+    price: p.basePrice,
+    originalPrice: p.originalPrice || null,
+    image: p.image?.url || null,
+    isNew: p.isNew || false
+  }));
+
   return (
     <>
-      <Navbar cartCount={2} />
+      <Navbar cartCount={0} />
 
-      {/* Hero Section - Full Width Background */}
+      {/* Hero Section - Dynamic Content */}
       <section className="hero" style={{
-        backgroundImage: 'url(/images/hero-model.jpg)',
+        backgroundImage: hero.backgroundImage?.url
+          ? `url(${hero.backgroundImage.url})`
+          : 'url(/images/hero-model.jpg)',
         backgroundSize: 'cover',
         backgroundPosition: 'center right'
       }}>
         <div className="hero-overlay"></div>
         <div className="hero-content">
-          <span className="hero-badge">NEW COLLECTION 2024</span>
+          {hero.badge && (
+            <span className="hero-badge">{hero.badge}</span>
+          )}
           <h1 className="hero-title">
-            Grace in Every<span>Wrap</span>
+            {hero.title}<span>{hero.titleHighlight}</span>
           </h1>
-          <p className="hero-text">
-            Discover our curated collection of premium hijabs and scarves.
-            Elegant fabrics, timeless styles, designed for the modern Muslimah.
-          </p>
+          {hero.subtitle && (
+            <p className="hero-text">{hero.subtitle}</p>
+          )}
           <div className="hero-buttons">
-            <Link href="/products" className="btn btn-gold">
-              Shop Hijabs <ArrowIcon />
-            </Link>
-            <Link href="/products?collection=lookbook" className="btn btn-outline-dark">
-              VIEW LOOKBOOK
-            </Link>
+            {hero.primaryButtonText && (
+              <Link href={hero.primaryButtonLink || '/products'} className="btn btn-gold">
+                {hero.primaryButtonText} <ArrowIcon />
+              </Link>
+            )}
+            {hero.secondaryButtonText && (
+              <Link href={hero.secondaryButtonLink || '/products'} className="btn btn-outline-dark">
+                {hero.secondaryButtonText}
+              </Link>
+            )}
           </div>
         </div>
       </section>

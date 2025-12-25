@@ -1,7 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { useAuth } from '@/context/AuthContext';
+import { useCart } from '@/context/CartContext';
 
 // Icons
 const SearchIcon = () => (
@@ -35,10 +37,38 @@ const ChevronIcon = () => (
     </svg>
 );
 
+const LogoutIcon = () => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
+        <polyline points="16 17 21 12 16 7" />
+        <line x1="21" y1="12" x2="9" y2="12" />
+    </svg>
+);
+
 const fabrics = ['Chiffon', 'Jersey', 'Satin', 'Modal', 'Cotton', 'Silk', 'Crepe', 'Voile'];
 
-export default function Navbar({ cartCount = 0 }) {
+export default function Navbar() {
     const [hijabDropdown, setHijabDropdown] = useState(false);
+    const [userDropdown, setUserDropdown] = useState(false);
+    const { user, logout, loading: authLoading } = useAuth();
+    const { itemCount } = useCart();
+    const userDropdownRef = useRef(null);
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        function handleClickOutside(event) {
+            if (userDropdownRef.current && !userDropdownRef.current.contains(event.target)) {
+                setUserDropdown(false);
+            }
+        }
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const handleLogout = async () => {
+        await logout();
+        setUserDropdown(false);
+    };
 
     return (
         <>
@@ -97,14 +127,139 @@ export default function Navbar({ cartCount = 0 }) {
                             <HeartIcon />
                         </Link>
 
-                        <Link href="/account" className="nav-icon-btn">
-                            <UserIcon />
-                        </Link>
+                        {/* User Dropdown */}
+                        <div ref={userDropdownRef} style={{ position: 'relative' }}>
+                            <button
+                                className="nav-icon-btn"
+                                onClick={() => setUserDropdown(!userDropdown)}
+                            >
+                                <UserIcon />
+                            </button>
 
-                        <Link href="/cart" className="nav-icon-btn">
+                            {userDropdown && (
+                                <div style={{
+                                    position: 'absolute',
+                                    top: '100%',
+                                    right: 0,
+                                    marginTop: '8px',
+                                    background: 'white',
+                                    borderRadius: '12px',
+                                    boxShadow: '0 10px 40px rgba(0,0,0,0.1)',
+                                    minWidth: '200px',
+                                    zIndex: 1000,
+                                    overflow: 'hidden'
+                                }}>
+                                    {user ? (
+                                        <>
+                                            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
+                                                <div style={{ fontWeight: '600', marginBottom: '4px' }}>
+                                                    {user.displayName || 'User'}
+                                                </div>
+                                                <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                                                    {user.email}
+                                                </div>
+                                            </div>
+                                            <Link
+                                                href="/profile"
+                                                onClick={() => setUserDropdown(false)}
+                                                style={{ display: 'block', padding: '12px 20px', fontSize: '14px', color: 'var(--text-primary)' }}
+                                            >
+                                                My Profile
+                                            </Link>
+                                            <Link
+                                                href="/profile/orders"
+                                                onClick={() => setUserDropdown(false)}
+                                                style={{ display: 'block', padding: '12px 20px', fontSize: '14px', color: 'var(--text-primary)' }}
+                                            >
+                                                My Orders
+                                            </Link>
+                                            <button
+                                                onClick={handleLogout}
+                                                style={{
+                                                    width: '100%',
+                                                    padding: '12px 20px',
+                                                    background: 'none',
+                                                    border: 'none',
+                                                    borderTop: '1px solid var(--border)',
+                                                    textAlign: 'left',
+                                                    cursor: 'pointer',
+                                                    fontSize: '14px',
+                                                    color: '#dc2626',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '8px'
+                                                }}
+                                            >
+                                                <LogoutIcon /> Logout
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
+                                                <div style={{ fontWeight: '600', marginBottom: '4px' }}>Welcome</div>
+                                                <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                                                    Sign in for the best experience
+                                                </div>
+                                            </div>
+                                            <div style={{ padding: '12px 20px', display: 'flex', gap: '8px' }}>
+                                                <Link
+                                                    href="/auth/login"
+                                                    onClick={() => setUserDropdown(false)}
+                                                    style={{
+                                                        flex: 1,
+                                                        padding: '10px',
+                                                        background: 'var(--primary)',
+                                                        color: 'white',
+                                                        borderRadius: '6px',
+                                                        textAlign: 'center',
+                                                        fontSize: '13px',
+                                                        fontWeight: '500'
+                                                    }}
+                                                >
+                                                    Sign In
+                                                </Link>
+                                                <Link
+                                                    href="/auth/register"
+                                                    onClick={() => setUserDropdown(false)}
+                                                    style={{
+                                                        flex: 1,
+                                                        padding: '10px',
+                                                        border: '1px solid var(--border)',
+                                                        borderRadius: '6px',
+                                                        textAlign: 'center',
+                                                        fontSize: '13px',
+                                                        fontWeight: '500'
+                                                    }}
+                                                >
+                                                    Register
+                                                </Link>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        <Link href="/cart" className="nav-icon-btn" style={{ position: 'relative' }}>
                             <CartIcon />
-                            {cartCount > 0 && (
-                                <span className="nav-cart-badge">{cartCount}</span>
+                            {itemCount > 0 && (
+                                <span style={{
+                                    position: 'absolute',
+                                    top: '-4px',
+                                    right: '-4px',
+                                    background: 'var(--primary)',
+                                    color: 'white',
+                                    fontSize: '10px',
+                                    fontWeight: '600',
+                                    width: '18px',
+                                    height: '18px',
+                                    borderRadius: '50%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                }}>
+                                    {itemCount > 9 ? '9+' : itemCount}
+                                </span>
                             )}
                         </Link>
                     </div>

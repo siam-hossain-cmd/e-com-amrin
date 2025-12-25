@@ -1,22 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-
-// Sample cart data (would come from context/state in real app)
-const cartItems = [
-    { id: 1, name: 'Premium Chiffon Hijab', color: 'Nude', price: 45, quantity: 2 },
-    { id: 2, name: 'Jersey Instant Hijab', color: 'Black', price: 35, quantity: 1 },
-    { id: 3, name: 'Modal Cotton Underscarf', color: 'White', price: 18, quantity: 3 }
-];
-
-const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-const shipping = subtotal >= 80 ? 0 : 10;
-const total = subtotal + shipping;
+import { useCart } from '@/context/CartContext';
+import { useAuth } from '@/context/AuthContext';
 
 export default function CheckoutPage() {
+    const router = useRouter();
+    const { cart, loading: cartLoading } = useCart();
+    const { user, loading: authLoading } = useAuth();
     const [step, setStep] = useState(1);
     const [shippingData, setShippingData] = useState({
         email: '',
@@ -36,6 +31,26 @@ export default function CheckoutPage() {
         expiry: '',
         cvv: ''
     });
+
+    // Use cart items from context
+    const cartItems = cart.items || [];
+    const subtotal = cart.total || 0;
+    const shipping = subtotal >= 80 ? 0 : 5; // RM 5 shipping, free above RM 80
+    const total = subtotal + shipping;
+
+    // Pre-fill email if user is logged in
+    useEffect(() => {
+        if (user?.email) {
+            setShippingData(prev => ({ ...prev, email: user.email }));
+        }
+    }, [user]);
+
+    // Redirect if cart is empty
+    useEffect(() => {
+        if (!cartLoading && cartItems.length === 0) {
+            router.push('/cart');
+        }
+    }, [cartLoading, cartItems, router]);
 
     const handleShippingChange = (e) => {
         setShippingData({ ...shippingData, [e.target.name]: e.target.value });
@@ -389,8 +404,8 @@ export default function CheckoutPage() {
                                     Order Summary
                                 </h3>
 
-                                {cartItems.map(item => (
-                                    <div key={item.id} style={{
+                                {cartItems.map((item, index) => (
+                                    <div key={item.productId + item.size + index} style={{
                                         display: 'flex',
                                         justifyContent: 'space-between',
                                         alignItems: 'center',
@@ -400,7 +415,7 @@ export default function CheckoutPage() {
                                         <div>
                                             <div style={{ fontSize: '14px', fontWeight: '500' }}>{item.name}</div>
                                             <div style={{ fontSize: '12px', color: '#999' }}>
-                                                {item.color} × {item.quantity}
+                                                {item.size}{item.color ? `, ${item.color}` : ''} × {item.quantity}
                                             </div>
                                         </div>
                                         <div style={{ fontWeight: '500' }}>

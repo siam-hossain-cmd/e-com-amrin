@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Header from '@/components/Header';
+import ImageUpload from '@/components/ImageUpload';
 
 // Icons
 const PlusIcon = () => (
@@ -22,39 +23,23 @@ const CloseIcon = () => (
     </svg>
 );
 
-// Sample banners data
-const bannersData = [
-    {
-        id: 1,
-        title: 'Winter Sale - Up to 50% Off',
-        position: 'hero',
-        link: '/products?sale=winter',
-        startDate: '2024-12-20',
-        endDate: '2024-12-31',
-        isActive: true,
-        bgColor: '#1e293b'
-    },
-    {
-        id: 2,
-        title: 'New Arrivals Collection',
-        position: 'hero',
-        link: '/products?new=true',
-        startDate: '2024-12-15',
-        endDate: '2025-01-15',
-        isActive: true,
-        bgColor: '#7c3aed'
-    },
-    {
-        id: 3,
-        title: 'Free Shipping Over ৳2000',
-        position: 'promo',
-        link: null,
-        startDate: '2024-12-01',
-        endDate: '2025-01-31',
-        isActive: true,
-        bgColor: '#059669'
-    }
-];
+const LoadingSpinner = () => (
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '60px' }}>
+        <div style={{
+            width: '40px',
+            height: '40px',
+            border: '3px solid var(--border)',
+            borderTopColor: 'var(--primary)',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite'
+        }} />
+        <style jsx>{`
+            @keyframes spin {
+                to { transform: rotate(360deg); }
+            }
+        `}</style>
+    </div>
+);
 
 const positions = [
     { value: 'hero', label: 'Hero Banner (Homepage)' },
@@ -64,45 +49,126 @@ const positions = [
 ];
 
 export default function BannersPage() {
-    const [banners, setBanners] = useState(bannersData);
+    const [banners, setBanners] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
     const [showModal, setShowModal] = useState(false);
     const [formData, setFormData] = useState({
         title: '',
+        subtitle: '',
         position: 'hero',
         link: '',
         startDate: '',
         endDate: '',
+        image: null,
         bgColor: '#1e293b'
     });
+
+    useEffect(() => {
+        fetchBanners();
+    }, []);
+
+    const fetchBanners = async () => {
+        try {
+            setLoading(true);
+            const res = await fetch('/api/banners');
+            if (res.ok) {
+                const data = await res.json();
+                setBanners(data);
+            }
+        } catch (error) {
+            console.error('Failed to fetch banners:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        const newBanner = {
-            id: Date.now(),
-            ...formData,
-            isActive: true
-        };
-        setBanners(prev => [...prev, newBanner]);
-        setShowModal(false);
-        setFormData({ title: '', position: 'hero', link: '', startDate: '', endDate: '', bgColor: '#1e293b' });
-    };
+        setSaving(true);
 
-    const deleteBanner = (id) => {
-        if (confirm('Delete this banner?')) {
-            setBanners(prev => prev.filter(b => b.id !== id));
+        try {
+            const res = await fetch('/api/banners', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            });
+
+            if (res.ok) {
+                const newBanner = await res.json();
+                setBanners(prev => [newBanner, ...prev]);
+                setShowModal(false);
+                setFormData({
+                    title: '',
+                    subtitle: '',
+                    position: 'hero',
+                    link: '',
+                    startDate: '',
+                    endDate: '',
+                    image: null,
+                    bgColor: '#1e293b'
+                });
+            }
+        } catch (error) {
+            console.error('Failed to create banner:', error);
+            alert('Failed to create banner. Please try again.');
+        } finally {
+            setSaving(false);
         }
     };
 
-    const toggleBanner = (id) => {
-        setBanners(prev => prev.map(b =>
-            b.id === id ? { ...b, isActive: !b.isActive } : b
-        ));
+    const deleteBanner = async (banner) => {
+        if (!confirm('Delete this banner?')) return;
+
+        try {
+            const res = await fetch('/api/banners', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ _id: banner._id, image: banner.image })
+            });
+
+            if (res.ok) {
+                setBanners(prev => prev.filter(b => b._id !== banner._id));
+            }
+        } catch (error) {
+            console.error('Failed to delete banner:', error);
+            alert('Failed to delete banner. Please try again.');
+        }
     };
+
+    const toggleBanner = async (banner) => {
+        try {
+            const res = await fetch('/api/banners', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ _id: banner._id, isActive: !banner.isActive })
+            });
+
+            if (res.ok) {
+                setBanners(prev => prev.map(b =>
+                    b._id === banner._id ? { ...b, isActive: !b.isActive } : b
+                ));
+            }
+        } catch (error) {
+            console.error('Failed to toggle banner:', error);
+        }
+    };
+
+    if (loading) {
+        return (
+            <>
+                <Header title="Banners & Posters" subtitle="Manage homepage banners and promotional content" />
+                <div className="page-content">
+                    <LoadingSpinner />
+                </div>
+            </>
+        );
+    }
 
     return (
         <>
@@ -140,62 +206,106 @@ export default function BannersPage() {
                 </div>
 
                 {/* Banners Grid */}
-                <div className="grid-2">
-                    {banners.map(banner => (
-                        <div key={banner.id} className="card" style={{ overflow: 'hidden' }}>
-                            {/* Preview */}
-                            <div style={{
-                                height: '120px',
-                                background: banner.bgColor,
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                color: 'white',
-                                fontSize: '18px',
-                                fontWeight: '600',
-                                padding: '20px',
-                                textAlign: 'center'
-                            }}>
-                                {banner.title}
-                            </div>
-
-                            <div className="card-body">
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                                    <div>
-                                        <div style={{ fontWeight: '600' }}>{banner.title}</div>
-                                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                                            {positions.find(p => p.value === banner.position)?.label}
+                {banners.length === 0 ? (
+                    <div style={{
+                        textAlign: 'center',
+                        padding: '60px 20px',
+                        background: 'var(--bg-secondary)',
+                        borderRadius: '12px'
+                    }}>
+                        <p style={{ color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                            No banners yet. Add your first banner to get started.
+                        </p>
+                        <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+                            <PlusIcon /> Add Banner
+                        </button>
+                    </div>
+                ) : (
+                    <div className="grid-2">
+                        {banners.map(banner => (
+                            <div key={banner._id} className="card" style={{ overflow: 'hidden' }}>
+                                {/* Preview */}
+                                <div style={{
+                                    height: '160px',
+                                    background: banner.image?.url
+                                        ? `url(${banner.image.url}) center/cover`
+                                        : banner.bgColor,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: 'white',
+                                    padding: '20px',
+                                    textAlign: 'center',
+                                    position: 'relative'
+                                }}>
+                                    {!banner.image?.url && (
+                                        <div>
+                                            <div style={{ fontSize: '20px', fontWeight: '600', marginBottom: '4px' }}>
+                                                {banner.title}
+                                            </div>
+                                            {banner.subtitle && (
+                                                <div style={{ fontSize: '14px', opacity: 0.9 }}>
+                                                    {banner.subtitle}
+                                                </div>
+                                            )}
                                         </div>
+                                    )}
+                                    {banner.image?.url && (
+                                        <div style={{
+                                            position: 'absolute',
+                                            bottom: '16px',
+                                            left: '16px',
+                                            background: 'rgba(0,0,0,0.7)',
+                                            padding: '8px 16px',
+                                            borderRadius: '8px'
+                                        }}>
+                                            <div style={{ fontWeight: '600' }}>{banner.title}</div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="card-body">
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                                        <div>
+                                            <div style={{ fontWeight: '600' }}>{banner.title}</div>
+                                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                                                {positions.find(p => p.value === banner.position)?.label}
+                                            </div>
+                                        </div>
+                                        <span className={`badge badge-${banner.isActive ? 'success' : 'warning'}`}>
+                                            {banner.isActive ? 'Active' : 'Inactive'}
+                                        </span>
                                     </div>
-                                    <span className={`badge badge-${banner.isActive ? 'success' : 'warning'}`}>
-                                        {banner.isActive ? 'Active' : 'Inactive'}
-                                    </span>
-                                </div>
 
-                                <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
-                                    {new Date(banner.startDate).toLocaleDateString()} - {new Date(banner.endDate).toLocaleDateString()}
-                                </div>
+                                    <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                                        {banner.startDate && banner.endDate ? (
+                                            `${new Date(banner.startDate).toLocaleDateString()} - ${new Date(banner.endDate).toLocaleDateString()}`
+                                        ) : (
+                                            'No date range set'
+                                        )}
+                                    </div>
 
-                                <div style={{ display: 'flex', gap: '8px' }}>
-                                    <button
-                                        className="btn btn-secondary btn-sm"
-                                        style={{ flex: 1 }}
-                                        onClick={() => toggleBanner(banner.id)}
-                                    >
-                                        {banner.isActive ? 'Deactivate' : 'Activate'}
-                                    </button>
-                                    <button
-                                        className="btn btn-secondary btn-icon"
-                                        onClick={() => deleteBanner(banner.id)}
-                                        style={{ color: 'var(--danger)' }}
-                                    >
-                                        <TrashIcon />
-                                    </button>
+                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                        <button
+                                            className="btn btn-secondary btn-sm"
+                                            style={{ flex: 1 }}
+                                            onClick={() => toggleBanner(banner)}
+                                        >
+                                            {banner.isActive ? 'Deactivate' : 'Activate'}
+                                        </button>
+                                        <button
+                                            className="btn btn-secondary btn-icon"
+                                            onClick={() => deleteBanner(banner)}
+                                            style={{ color: 'var(--danger)' }}
+                                        >
+                                            <TrashIcon />
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    ))}
-                </div>
+                        ))}
+                    </div>
+                )}
 
                 {/* Add Modal */}
                 {showModal && (
@@ -209,6 +319,14 @@ export default function BannersPage() {
                             </div>
                             <form onSubmit={handleSubmit}>
                                 <div className="modal-body">
+                                    {/* Image Upload */}
+                                    <ImageUpload
+                                        value={formData.image}
+                                        onChange={(img) => setFormData(prev => ({ ...prev, image: img }))}
+                                        folder="banners"
+                                        label="Banner Image (optional - will use color if not set)"
+                                    />
+
                                     <div className="form-group">
                                         <label className="form-label">Banner Title *</label>
                                         <input
@@ -219,6 +337,18 @@ export default function BannersPage() {
                                             onChange={handleInputChange}
                                             placeholder="e.g., Summer Sale - 50% Off"
                                             required
+                                        />
+                                    </div>
+
+                                    <div className="form-group">
+                                        <label className="form-label">Subtitle</label>
+                                        <input
+                                            type="text"
+                                            name="subtitle"
+                                            className="form-input"
+                                            value={formData.subtitle}
+                                            onChange={handleInputChange}
+                                            placeholder="e.g., Limited time offer"
                                         />
                                     </div>
 
@@ -237,7 +367,7 @@ export default function BannersPage() {
                                             </select>
                                         </div>
                                         <div className="form-group">
-                                            <label className="form-label">Background Color</label>
+                                            <label className="form-label">Background Color (if no image)</label>
                                             <input
                                                 type="color"
                                                 name="bgColor"
@@ -287,11 +417,11 @@ export default function BannersPage() {
                                     </div>
                                 </div>
                                 <div className="modal-footer">
-                                    <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>
+                                    <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)} disabled={saving}>
                                         Cancel
                                     </button>
-                                    <button type="submit" className="btn btn-primary">
-                                        Add Banner
+                                    <button type="submit" className="btn btn-primary" disabled={saving}>
+                                        {saving ? 'Adding...' : 'Add Banner'}
                                     </button>
                                 </div>
                             </form>
