@@ -64,6 +64,41 @@ async function getFeaturedProducts() {
   return [];
 }
 
+// Fetch categories from database
+async function getCategories() {
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3001';
+    const res = await fetch(`${baseUrl}/api/catalog`, { next: { revalidate: 60 } });
+    if (res.ok) {
+      const data = await res.json();
+      return data.categories || [];
+    }
+  } catch (error) {
+    console.error('Failed to fetch categories:', error);
+  }
+  return [];
+}
+
+// Get product counts per category
+async function getCategoryCounts() {
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3001';
+    const res = await fetch(`${baseUrl}/api/products?limit=1000`, { next: { revalidate: 60 } });
+    if (res.ok) {
+      const products = await res.json();
+      const counts = {};
+      products.forEach(p => {
+        const cat = (p.category || '').toLowerCase();
+        counts[cat] = (counts[cat] || 0) + 1;
+      });
+      return counts;
+    }
+  } catch (error) {
+    console.error('Failed to fetch product counts:', error);
+  }
+  return {};
+}
+
 // Default hero settings  
 const defaultHero = {
   badge: 'NEW COLLECTION 2024',
@@ -85,18 +120,24 @@ const fallbackProducts = [
   { _id: '4', name: 'Modal Cotton Underscarf', brand: 'Amrin Basics', basePrice: 18, originalPrice: null, image: null, isNew: true },
 ];
 
-const categories = [
-  { name: 'Hijabs', count: 156, gradient: 'linear-gradient(135deg, #d4c4b5, #c4a77d)' },
-  { name: 'Scarves', count: 98, gradient: 'linear-gradient(135deg, #c9b8a5, #b09567)' },
-  { name: 'Instant Hijabs', count: 67, gradient: 'linear-gradient(135deg, #e8dfd4, #d4cec6)' },
-  { name: 'Underscarves', count: 45, gradient: 'linear-gradient(135deg, #ece5dc, #d4c4b5)' },
-];
+// Category gradient colors for display
+const categoryGradients = {
+  'hijabs': 'linear-gradient(135deg, #d4c4b5, #c4a77d)',
+  'scarves': 'linear-gradient(135deg, #c9b8a5, #b09567)',
+  'instant-hijabs': 'linear-gradient(135deg, #e8dfd4, #d4cec6)',
+  'underscarves': 'linear-gradient(135deg, #ece5dc, #d4c4b5)',
+  'shawls': 'linear-gradient(135deg, #c9bfb5, #a89585)',
+  'accessories': 'linear-gradient(135deg, #ddd5cc, #c4b8a8)',
+};
+const defaultGradient = 'linear-gradient(135deg, #e0d6cc, #c9b8a5)';
 
 export default async function HomePage() {
   // Fetch data on server
-  const [heroData, productsData] = await Promise.all([
+  const [heroData, productsData, categoriesData, productCounts] = await Promise.all([
     getHeroSettings(),
-    getFeaturedProducts()
+    getFeaturedProducts(),
+    getCategories(),
+    getCategoryCounts()
   ]);
 
   const hero = heroData || defaultHero;
@@ -160,19 +201,21 @@ export default async function HomePage() {
           </div>
 
           <div className="categories-grid">
-            {categories.map((category) => (
+            {categoriesData.map((category) => (
               <Link
-                href={`/products?category=${category.name.toLowerCase().replace(' ', '-')}`}
-                key={category.name}
+                href={`/products?category=${category.slug || category.name.toLowerCase().replace(' ', '-')}`}
+                key={category.id || category.name}
                 className="category-card"
               >
                 <div
                   className="category-card-bg"
-                  style={{ background: category.gradient }}
+                  style={{ background: categoryGradients[category.slug] || defaultGradient }}
                 />
                 <div className="category-card-content">
                   <h3 className="category-card-title">{category.name}</h3>
-                  <p className="category-card-count">{category.count} Products</p>
+                  <p className="category-card-count">
+                    {productCounts[category.name.toLowerCase()] || 0} Products
+                  </p>
                 </div>
               </Link>
             ))}
