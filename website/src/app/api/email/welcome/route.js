@@ -1,7 +1,7 @@
 // API Route: POST /api/email/welcome
-// Send welcome email to new users using Brevo SMTP
+// Send welcome email to new users using Hostinger Business Email
 
-import nodemailer from 'nodemailer';
+import { createTransporter, EMAIL_FROM, emailTemplates } from '@/lib/email';
 
 export async function POST(request) {
     try {
@@ -11,23 +11,14 @@ export async function POST(request) {
             return Response.json({ error: 'Email is required' }, { status: 400 });
         }
 
-        // Create transporter - for Brevo, user is your Brevo SMTP login
-        const transporter = nodemailer.createTransport({
-            host: 'smtp-relay.brevo.com',
-            port: 587,
-            secure: false,
-            auth: {
-                user: '9ec411001@smtp-brevo.com', // Brevo SMTP login
-                pass: process.env.BREVO_SMTP_KEY
-            }
-        });
+        const transporter = createTransporter();
 
         const userName = name || email.split('@')[0];
 
         const mailOptions = {
-            from: '"Amrin Exclusive" <reemresort2.0@gmail.com>',
+            from: EMAIL_FROM.info,
             to: email,
-            subject: '🎉 Welcome to Amrin - Your Fashion Journey Begins!',
+            subject: 'Welcome to Amrin - Your Fashion Journey Begins!',
             html: `
 <!DOCTYPE html>
 <html>
@@ -100,7 +91,7 @@ export async function POST(request) {
         };
 
         console.log('Sending email to:', email);
-        console.log('Using SMTP key:', process.env.BREVO_SMTP_KEY ? 'Key present' : 'KEY MISSING!');
+        console.log('Using Hostinger email:', process.env.HOSTINGER_EMAIL_USER ? 'Configured' : 'MISSING!');
 
         await transporter.sendMail(mailOptions);
         console.log('Email sent successfully to:', email);
