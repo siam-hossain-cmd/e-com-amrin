@@ -1,20 +1,29 @@
 'use client';
 
-import { usePathname } from 'next/navigation';
+import { useEffect } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import { AdminAuthProvider, useAdminAuth } from '@/context/AdminAuthContext';
 
-// Layout wrapper that conditionally shows sidebar
+// Layout wrapper that conditionally shows sidebar and protects routes
 function LayoutContent({ children }) {
     const pathname = usePathname();
+    const router = useRouter();
     const { admin, loading } = useAdminAuth();
 
-    // Pages that should not show sidebar
-    const noSidebarPages = ['/login', '/register', '/forgot-password'];
-    const isAuthPage = noSidebarPages.some(page => pathname.startsWith(page));
+    // Pages that should not require authentication
+    const publicPages = ['/login', '/register', '/forgot-password'];
+    const isPublicPage = publicPages.some(page => pathname.startsWith(page));
+
+    // Redirect unauthenticated users to login
+    useEffect(() => {
+        if (!loading && !admin && !isPublicPage) {
+            router.replace('/login');
+        }
+    }, [admin, loading, isPublicPage, router]);
 
     // Show loading spinner while checking auth
-    if (loading && !isAuthPage) {
+    if (loading) {
         return (
             <div style={{
                 minHeight: '100vh',
@@ -36,12 +45,27 @@ function LayoutContent({ children }) {
         );
     }
 
-    // Auth pages (login, register) - no sidebar
-    if (isAuthPage) {
+    // Public pages (login, register) - no sidebar, no auth required
+    if (isPublicPage) {
         return <>{children}</>;
     }
 
-    // Dashboard pages - show sidebar
+    // Not logged in and not on public page - show loading (will redirect)
+    if (!admin) {
+        return (
+            <div style={{
+                minHeight: '100vh',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: '#f8f9fa'
+            }}>
+                <div>Redirecting to login...</div>
+            </div>
+        );
+    }
+
+    // Dashboard pages - user is authenticated, show sidebar
     return (
         <div className="admin-layout">
             <Sidebar />
