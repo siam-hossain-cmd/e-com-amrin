@@ -32,11 +32,12 @@ export default function Footer() {
             <div className="container">
                 <div className="footer-grid">
                     <div>
-                        <div className="footer-brand">AMRIN</div>
+                        <div className="footer-brand">AMRIN EXCLUSIVE</div>
                         <p className="footer-about">
                             Your destination for elegant hijabs and modest fashion.
                             Premium fabrics, timeless designs, crafted for the modern Muslimah.
                         </p>
+                        <p className="footer-company">ARS MULTIGROUP SDN BHD (1286095-V)</p>
                         <div className="footer-social">
                             <a href="#" aria-label="Facebook"><FacebookIcon /></a>
                             <a href="#" aria-label="Instagram"><InstagramIcon /></a>
@@ -63,21 +64,25 @@ export default function Footer() {
                             <Link href="/help/returns">Returns & Exchange</Link>
                             <Link href="/help/sizing">Size Guide</Link>
                             <Link href="/help/faq">FAQ</Link>
+                            <Link href="/help/privacy">Privacy Policy</Link>
+                            <Link href="/help/terms">Terms of Service</Link>
                         </div>
                     </div>
 
                     <div>
                         <h4 className="footer-title">Contact</h4>
                         <div className="footer-links">
-                            <a href="mailto:hello@amrin.my">hello@amrin.my</a>
-                            <a href="tel:+60123456789">+60 12-345 6789</a>
-                            <span>Kuala Lumpur, Malaysia</span>
+                            <a href="mailto:info@amrinexclussive.com">info@amrinexclussive.com</a>
+                            <a href="tel:+60379726456">03-7972 6456</a>
+                            <span>Unit 5-18, Plaza Prima,</span>
+                            <span>Old Jalan Klang Lama,</span>
+                            <span>Kuala Lumpur 58200, Malaysia</span>
                         </div>
                     </div>
                 </div>
 
                 <div className="footer-bottom">
-                    © 2024 AMRIN. All rights reserved.
+                    © 2024 AMRIN EXCLUSIVE. All rights reserved.
                 </div>
             </div>
         </footer>

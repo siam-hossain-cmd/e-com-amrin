@@ -68,7 +68,7 @@ export default function ProductsPage() {
         originalPrice: '',
         description: '',
         image: null,
-        variants: [{ size: '', color: '', stock: '', price: '' }]
+        variants: [{ size: '', color: '', stock: '', price: '', minStock: '10' }]
     });
 
     // Fetch products on mount
@@ -111,7 +111,7 @@ export default function ProductsPage() {
             originalPrice: '',
             description: '',
             image: null,
-            variants: [{ size: '', color: '', stock: '', price: '' }]
+            variants: [{ size: '', color: '', stock: '', price: '', minStock: '10' }]
         });
         setShowModal(true);
     };
@@ -131,8 +131,9 @@ export default function ProductsPage() {
                 size: v.size,
                 color: v.color,
                 stock: v.stock?.toString() || '',
-                price: v.price?.toString() || ''
-            })) || [{ size: '', color: '', stock: '', price: '' }]
+                price: v.price?.toString() || '',
+                minStock: v.minStock?.toString() || '10'
+            })) || [{ size: '', color: '', stock: '', price: '', minStock: '10' }]
         });
         setShowModal(true);
     };
@@ -156,7 +157,7 @@ export default function ProductsPage() {
     const addVariant = () => {
         setFormData(prev => ({
             ...prev,
-            variants: [...prev.variants, { size: '', color: '', stock: '', price: formData.basePrice }]
+            variants: [...prev.variants, { size: '', color: '', stock: '', price: formData.basePrice, minStock: '10' }]
         }));
     };
 
@@ -196,7 +197,8 @@ export default function ProductsPage() {
                     size: v.size,
                     color: v.color,
                     stock: parseInt(v.stock) || 0,
-                    price: parseInt(v.price) || parseInt(formData.basePrice)
+                    price: parseInt(v.price) || parseInt(formData.basePrice),
+                    minStock: parseInt(v.minStock) || 10
                 })),
                 status: 'active'
             };
@@ -494,7 +496,7 @@ export default function ProductsPage() {
                                         {formData.variants.map((variant, index) => (
                                             <div key={index} style={{
                                                 display: 'grid',
-                                                gridTemplateColumns: '1fr 1fr 100px 120px auto',
+                                                gridTemplateColumns: '1fr 1fr 80px 80px 100px auto',
                                                 gap: '12px',
                                                 marginBottom: '12px',
                                                 padding: '16px',
@@ -529,7 +531,16 @@ export default function ProductsPage() {
                                                     value={variant.stock}
                                                     onChange={(e) => handleVariantChange(index, 'stock', e.target.value)}
                                                     placeholder="Stock"
+                                                    title="Current Stock"
                                                     required
+                                                />
+                                                <input
+                                                    type="number"
+                                                    className="form-input"
+                                                    value={variant.minStock || '10'}
+                                                    onChange={(e) => handleVariantChange(index, 'minStock', e.target.value)}
+                                                    placeholder="Min"
+                                                    title="Minimum Stock (for low stock alert)"
                                                 />
                                                 <input
                                                     type="number"
@@ -537,6 +548,7 @@ export default function ProductsPage() {
                                                     value={variant.price || formData.basePrice}
                                                     onChange={(e) => handleVariantChange(index, 'price', e.target.value)}
                                                     placeholder="Price"
+                                                    title="Variant Price"
                                                 />
                                                 {formData.variants.length > 1 && (
                                                     <button

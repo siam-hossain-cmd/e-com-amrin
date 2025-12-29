@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Header from '@/components/Header';
 
 // Icons
@@ -18,26 +18,33 @@ const EditIcon = () => (
     </svg>
 );
 
-// Sample inventory data
-const inventoryData = [
-    { sku: 'CWT-S-WHT-001', product: 'Classic White T-Shirt', size: 'S', color: 'White', stock: 15, minStock: 10, price: 1200 },
-    { sku: 'CWT-M-WHT-002', product: 'Classic White T-Shirt', size: 'M', color: 'White', stock: 25, minStock: 10, price: 1200 },
-    { sku: 'CWT-L-WHT-003', product: 'Classic White T-Shirt', size: 'L', color: 'White', stock: 5, minStock: 10, price: 1200 },
-    { sku: 'DJP-M-BLU-001', product: 'Denim Jacket Premium', size: 'M', color: 'Blue', stock: 8, minStock: 5, price: 5000 },
-    { sku: 'DJP-L-BLU-002', product: 'Denim Jacket Premium', size: 'L', color: 'Blue', stock: 3, minStock: 5, price: 5000 },
-    { sku: 'DJP-XL-BLU-003', product: 'Denim Jacket Premium', size: 'XL', color: 'Blue', stock: 0, minStock: 5, price: 5000 },
-    { sku: 'SFD-S-FLR-001', product: 'Summer Floral Dress', size: 'S', color: 'Floral', stock: 12, minStock: 5, price: 3000 },
-    { sku: 'SFD-M-FLR-002', product: 'Summer Floral Dress', size: 'M', color: 'Floral', stock: 0, minStock: 5, price: 3000 },
-    { sku: 'CPS-M-NAV-001', product: 'Cotton Polo Shirt', size: 'M', color: 'Navy', stock: 20, minStock: 10, price: 1500 },
-    { sku: 'CPS-L-NAV-002', product: 'Cotton Polo Shirt', size: 'L', color: 'Navy', stock: 18, minStock: 10, price: 1500 },
-    { sku: 'CPS-M-WHT-003', product: 'Cotton Polo Shirt', size: 'M', color: 'White', stock: 22, minStock: 10, price: 1500 },
-];
-
 export default function InventoryPage() {
-    const [inventory, setInventory] = useState(inventoryData);
+    const [inventory, setInventory] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('all'); // all, low, out
     const [editingSku, setEditingSku] = useState(null);
     const [editStock, setEditStock] = useState('');
+    const [saving, setSaving] = useState(false);
+
+    // Fetch inventory from API
+    useEffect(() => {
+        fetchInventory();
+    }, []);
+
+    const fetchInventory = async () => {
+        try {
+            setLoading(true);
+            const res = await fetch('/api/inventory');
+            if (res.ok) {
+                const data = await res.json();
+                setInventory(data);
+            }
+        } catch (error) {
+            console.error('Error fetching inventory:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const filteredInventory = inventory.filter(item => {
         if (filter === 'low') return item.stock > 0 && item.stock < item.minStock;
@@ -47,26 +54,62 @@ export default function InventoryPage() {
 
     const lowStockCount = inventory.filter(i => i.stock > 0 && i.stock < i.minStock).length;
     const outOfStockCount = inventory.filter(i => i.stock === 0).length;
-    const totalItems = inventory.reduce((sum, i) => sum + i.stock, 0);
-    const totalValue = inventory.reduce((sum, i) => sum + (i.stock * i.price), 0);
+    const totalItems = inventory.reduce((sum, i) => sum + (i.stock || 0), 0);
+    const totalValue = inventory.reduce((sum, i) => sum + ((i.stock || 0) * (i.price || 0)), 0);
 
     const startEdit = (sku, currentStock) => {
         setEditingSku(sku);
         setEditStock(currentStock.toString());
     };
 
-    const saveStock = (sku) => {
-        setInventory(prev => prev.map(item =>
-            item.sku === sku ? { ...item, stock: parseInt(editStock) || 0 } : item
-        ));
-        setEditingSku(null);
-        setEditStock('');
+    const saveStock = async (item) => {
+        setSaving(true);
+        try {
+            const res = await fetch('/api/inventory', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    productId: item.productId,
+                    variantId: item._id !== item.productId ? item._id : null,
+                    sku: item.sku,
+                    stock: parseInt(editStock) || 0
+                })
+            });
+
+            if (res.ok) {
+                // Update local state
+                setInventory(prev => prev.map(inv =>
+                    inv.sku === item.sku ? { ...inv, stock: parseInt(editStock) || 0 } : inv
+                ));
+            }
+        } catch (error) {
+            console.error('Error updating stock:', error);
+        } finally {
+            setSaving(false);
+            setEditingSku(null);
+            setEditStock('');
+        }
     };
 
     const cancelEdit = () => {
         setEditingSku(null);
         setEditStock('');
     };
+
+    if (loading) {
+        return (
+            <>
+                <Header title="Inventory" subtitle="Track and manage stock levels" />
+                <div className="page-content">
+                    <div style={{ textAlign: 'center', padding: '60px 0' }}>
+                        <div className="spinner" style={{ width: '40px', height: '40px', border: '3px solid #e5e7eb', borderTopColor: '#c4a77d', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto' }} />
+                        <p style={{ marginTop: '16px', color: 'var(--text-secondary)' }}>Loading inventory...</p>
+                        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                    </div>
+                </div>
+            </>
+        );
+    }
 
     return (
         <>
@@ -103,11 +146,16 @@ export default function InventoryPage() {
                             <div style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Total Inventory Value</div>
                             <div style={{ fontSize: '28px', fontWeight: '700', color: 'var(--accent)' }}>RM {totalValue.toLocaleString()}</div>
                         </div>
-                        {filter !== 'all' && (
-                            <button className="btn btn-secondary" onClick={() => setFilter('all')}>
-                                Show All
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                            {filter !== 'all' && (
+                                <button className="btn btn-secondary" onClick={() => setFilter('all')}>
+                                    Show All
+                                </button>
+                            )}
+                            <button className="btn btn-secondary" onClick={fetchInventory}>
+                                Refresh
                             </button>
-                        )}
+                        </div>
                     </div>
                 </div>
 
@@ -119,73 +167,86 @@ export default function InventoryPage() {
                         </h3>
                     </div>
                     <div className="table-container">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>SKU</th>
-                                    <th>Product</th>
-                                    <th>Size</th>
-                                    <th>Color</th>
-                                    <th>Stock</th>
-                                    <th>Min Stock</th>
-                                    <th>Status</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filteredInventory.map((item) => (
-                                    <tr key={item.sku}>
-                                        <td><code style={{ fontSize: '12px' }}>{item.sku}</code></td>
-                                        <td><strong>{item.product}</strong></td>
-                                        <td>{item.size}</td>
-                                        <td>{item.color}</td>
-                                        <td>
-                                            {editingSku === item.sku ? (
-                                                <input
-                                                    type="number"
-                                                    className="form-input"
-                                                    style={{ width: '80px', padding: '6px 10px' }}
-                                                    value={editStock}
-                                                    onChange={(e) => setEditStock(e.target.value)}
-                                                    autoFocus
-                                                />
-                                            ) : (
-                                                <strong>{item.stock}</strong>
-                                            )}
-                                        </td>
-                                        <td>{item.minStock}</td>
-                                        <td>
-                                            {item.stock === 0 ? (
-                                                <span className="badge badge-danger">
-                                                    <AlertIcon /> Out of Stock
-                                                </span>
-                                            ) : item.stock < item.minStock ? (
-                                                <span className="badge badge-warning">
-                                                    <AlertIcon /> Low Stock
-                                                </span>
-                                            ) : (
-                                                <span className="badge badge-success">In Stock</span>
-                                            )}
-                                        </td>
-                                        <td>
-                                            {editingSku === item.sku ? (
-                                                <div style={{ display: 'flex', gap: '8px' }}>
-                                                    <button className="btn btn-primary btn-sm" onClick={() => saveStock(item.sku)}>Save</button>
-                                                    <button className="btn btn-secondary btn-sm" onClick={cancelEdit}>Cancel</button>
-                                                </div>
-                                            ) : (
-                                                <button
-                                                    className="btn btn-secondary btn-icon"
-                                                    onClick={() => startEdit(item.sku, item.stock)}
-                                                >
-                                                    <EditIcon />
-                                                </button>
-                                            )}
-                                        </td>
+                        {inventory.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
+                                <p>No inventory items found.</p>
+                                <p style={{ fontSize: '14px' }}>Add products with variants to see them here.</p>
+                            </div>
+                        ) : (
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>SKU</th>
+                                        <th>Product</th>
+                                        <th>Size</th>
+                                        <th>Color</th>
+                                        <th>Stock</th>
+                                        <th>Min Stock</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody>
+                                    {filteredInventory.map((item) => (
+                                        <tr key={item.sku || item._id}>
+                                            <td><code style={{ fontSize: '12px' }}>{item.sku}</code></td>
+                                            <td><strong>{item.product}</strong></td>
+                                            <td>{item.size}</td>
+                                            <td>{item.color}</td>
+                                            <td>
+                                                {editingSku === item.sku ? (
+                                                    <input
+                                                        type="number"
+                                                        className="form-input"
+                                                        style={{ width: '80px', padding: '6px 10px' }}
+                                                        value={editStock}
+                                                        onChange={(e) => setEditStock(e.target.value)}
+                                                        autoFocus
+                                                    />
+                                                ) : (
+                                                    <strong>{item.stock}</strong>
+                                                )}
+                                            </td>
+                                            <td>{item.minStock}</td>
+                                            <td>
+                                                {item.stock === 0 ? (
+                                                    <span className="badge badge-danger">
+                                                        <AlertIcon /> Out of Stock
+                                                    </span>
+                                                ) : item.stock < item.minStock ? (
+                                                    <span className="badge badge-warning">
+                                                        <AlertIcon /> Low Stock
+                                                    </span>
+                                                ) : (
+                                                    <span className="badge badge-success">In Stock</span>
+                                                )}
+                                            </td>
+                                            <td>
+                                                {editingSku === item.sku ? (
+                                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                                        <button
+                                                            className="btn btn-primary btn-sm"
+                                                            onClick={() => saveStock(item)}
+                                                            disabled={saving}
+                                                        >
+                                                            {saving ? '...' : 'Save'}
+                                                        </button>
+                                                        <button className="btn btn-secondary btn-sm" onClick={cancelEdit}>Cancel</button>
+                                                    </div>
+                                                ) : (
+                                                    <button
+                                                        className="btn btn-secondary btn-icon"
+                                                        onClick={() => startEdit(item.sku, item.stock)}
+                                                    >
+                                                        <EditIcon />
+                                                    </button>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
                     </div>
                 </div>
             </div>

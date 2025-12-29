@@ -7,12 +7,12 @@ import clientPromise, { DB_NAME, COLLECTIONS } from '@/lib/mongodb';
 const defaultCatalog = {
     fabrics: ['Chiffon', 'Jersey', 'Satin Silk', 'Modal', 'Cotton', 'Cashmere', 'Crepe', 'Voile', 'Silk', 'Satin'],
     categories: [
-        { id: 'hijabs', name: 'Hijabs', slug: 'hijabs', subcategories: ['Chiffon', 'Jersey', 'Satin', 'Modal', 'Cotton', 'Silk', 'Crepe', 'Voile'] },
-        { id: 'scarves', name: 'Scarves', slug: 'scarves', subcategories: ['Printed', 'Plain', 'Embroidered'] },
-        { id: 'instant', name: 'Instant Hijabs', slug: 'instant-hijabs', subcategories: ['Tie-Back', 'Slip-On', 'Pinless'] },
-        { id: 'underscarves', name: 'Underscarves', slug: 'underscarves', subcategories: ['Cotton', 'Modal', 'Bamboo'] },
-        { id: 'shawls', name: 'Shawls', slug: 'shawls', subcategories: ['Pashmina', 'Cashmere', 'Wool Blend'] },
-        { id: 'accessories', name: 'Accessories', slug: 'accessories', subcategories: ['Pins', 'Magnets', 'Caps', 'Headbands'] }
+        { id: 'hijabs', name: 'Hijabs', slug: 'hijabs', showInNav: true, order: 1, subcategories: ['Chiffon', 'Jersey', 'Satin', 'Modal', 'Cotton', 'Silk', 'Crepe', 'Voile'] },
+        { id: 'scarves', name: 'Scarves', slug: 'scarves', showInNav: true, order: 2, subcategories: ['Printed', 'Plain', 'Embroidered'] },
+        { id: 'instant', name: 'Instant Hijabs', slug: 'instant-hijabs', showInNav: true, order: 3, subcategories: ['Tie-Back', 'Slip-On', 'Pinless'] },
+        { id: 'underscarves', name: 'Underscarves', slug: 'underscarves', showInNav: true, order: 4, subcategories: ['Cotton', 'Modal', 'Bamboo'] },
+        { id: 'shawls', name: 'Shawls', slug: 'shawls', showInNav: true, order: 5, subcategories: ['Pashmina', 'Cashmere', 'Wool Blend'] },
+        { id: 'accessories', name: 'Accessories', slug: 'accessories', showInNav: true, order: 6, subcategories: ['Pins', 'Magnets', 'Caps', 'Headbands'] }
     ],
     colors: ['Black', 'White', 'Nude', 'Grey', 'Navy', 'Navy Blue', 'Maroon', 'Emerald', 'Dusty Pink', 'Sage Green', 'Cream', 'Brown', 'Burgundy', 'Lavender', 'Mint', 'Coral'],
     sizes: ['Standard', '45x45', '50x50', '55x55', '70x70']

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Header from '@/components/Header';
 
 // Icons
@@ -22,99 +22,137 @@ const CloseIcon = () => (
     </svg>
 );
 
-// Sample discounts data
-const discountsData = [
-    {
-        id: 1,
-        code: 'WELCOME20',
-        type: 'percentage',
-        value: 20,
-        minOrder: 1000,
-        maxUses: 100,
-        usedCount: 45,
-        expiryDate: '2024-12-31',
-        status: 'active'
-    },
-    {
-        id: 2,
-        code: 'FLAT500',
-        type: 'fixed',
-        value: 500,
-        minOrder: 3000,
-        maxUses: 50,
-        usedCount: 12,
-        expiryDate: '2024-12-25',
-        status: 'active'
-    },
-    {
-        id: 3,
-        code: 'BOGO',
-        type: 'bogo',
-        value: 0,
-        minOrder: 0,
-        maxUses: null,
-        usedCount: 23,
-        expiryDate: '2024-12-24',
-        status: 'active'
-    },
-    {
-        id: 4,
-        code: 'NEWYEAR25',
-        type: 'percentage',
-        value: 25,
-        minOrder: 2000,
-        maxUses: 200,
-        usedCount: 0,
-        expiryDate: '2025-01-15',
-        status: 'scheduled'
-    }
-];
+const LoadingSpinner = () => (
+    <div style={{ display: 'flex', justifyContent: 'center', padding: '60px' }}>
+        <div style={{
+            width: '40px', height: '40px',
+            border: '3px solid #f0f0f0',
+            borderTop: '3px solid var(--accent)',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite'
+        }} />
+        <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+    </div>
+);
 
 export default function DiscountsPage() {
-    const [discounts, setDiscounts] = useState(discountsData);
+    const [discounts, setDiscounts] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
+    const [saving, setSaving] = useState(false);
     const [formData, setFormData] = useState({
         code: '',
         type: 'percentage',
         value: '',
         minOrder: '',
         maxUses: '',
-        expiryDate: ''
+        expiryDate: '',
+        onePerUser: false
     });
 
-    const handleInputChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
-    };
+    // Fetch discounts from API
+    useEffect(() => {
+        fetchDiscounts();
+    }, []);
 
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        const newDiscount = {
-            id: Date.now(),
-            code: formData.code.toUpperCase(),
-            type: formData.type,
-            value: parseInt(formData.value) || 0,
-            minOrder: parseInt(formData.minOrder) || 0,
-            maxUses: formData.maxUses ? parseInt(formData.maxUses) : null,
-            usedCount: 0,
-            expiryDate: formData.expiryDate,
-            status: 'active'
-        };
-        setDiscounts(prev => [...prev, newDiscount]);
-        setShowModal(false);
-        setFormData({ code: '', type: 'percentage', value: '', minOrder: '', maxUses: '', expiryDate: '' });
-    };
-
-    const deleteDiscount = (id) => {
-        if (confirm('Delete this discount code?')) {
-            setDiscounts(prev => prev.filter(d => d.id !== id));
+    const fetchDiscounts = async () => {
+        try {
+            setLoading(true);
+            const res = await fetch('/api/discounts');
+            if (res.ok) {
+                const data = await res.json();
+                setDiscounts(data);
+            }
+        } catch (error) {
+            console.error('Failed to fetch discounts:', error);
+        } finally {
+            setLoading(false);
         }
     };
 
-    const toggleStatus = (id) => {
-        setDiscounts(prev => prev.map(d =>
-            d.id === id ? { ...d, status: d.status === 'active' ? 'inactive' : 'active' } : d
-        ));
+    const handleInputChange = (e) => {
+        const { name, value, type, checked } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            [name]: type === 'checkbox' ? checked : value
+        }));
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setSaving(true);
+
+        try {
+            const res = await fetch('/api/discounts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                setDiscounts(prev => [{
+                    _id: data._id,
+                    code: formData.code.toUpperCase(),
+                    type: formData.type,
+                    value: parseInt(formData.value) || 0,
+                    minOrder: parseInt(formData.minOrder) || 0,
+                    maxUses: formData.maxUses ? parseInt(formData.maxUses) : null,
+                    usedCount: 0,
+                    onePerUser: formData.onePerUser,
+                    expiryDate: formData.expiryDate,
+                    status: 'active'
+                }, ...prev]);
+                setShowModal(false);
+                setFormData({ code: '', type: 'percentage', value: '', minOrder: '', maxUses: '', expiryDate: '', onePerUser: false });
+            } else {
+                const error = await res.json();
+                alert(error.error || 'Failed to create discount');
+            }
+        } catch (error) {
+            console.error('Failed to create discount:', error);
+            alert('Failed to create discount');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const deleteDiscount = async (id) => {
+        if (!confirm('Delete this discount code?')) return;
+
+        try {
+            const res = await fetch('/api/discounts', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ _id: id })
+            });
+
+            if (res.ok) {
+                setDiscounts(prev => prev.filter(d => d._id !== id));
+            }
+        } catch (error) {
+            console.error('Failed to delete discount:', error);
+        }
+    };
+
+    const toggleStatus = async (id, currentStatus) => {
+        const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+
+        try {
+            const res = await fetch('/api/discounts', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ _id: id, status: newStatus })
+            });
+
+            if (res.ok) {
+                setDiscounts(prev => prev.map(d =>
+                    d._id === id ? { ...d, status: newStatus } : d
+                ));
+            }
+        } catch (error) {
+            console.error('Failed to update status:', error);
+        }
     };
 
     return (
@@ -153,68 +191,79 @@ export default function DiscountsPage() {
                 </div>
 
                 {/* Discounts Cards */}
-                <div className="grid-2">
-                    {discounts.map(discount => (
-                        <div key={discount.id} className="card">
-                            <div className="card-body">
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
-                                    <div>
-                                        <div style={{
-                                            fontSize: '24px',
-                                            fontWeight: '700',
-                                            color: 'var(--accent)',
-                                            letterSpacing: '1px'
-                                        }}>
-                                            {discount.code}
+                {loading ? (
+                    <LoadingSpinner />
+                ) : (
+                    <div className="grid-2">
+                        {discounts.map(discount => (
+                            <div key={discount._id} className="card">
+                                <div className="card-body">
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                                        <div>
+                                            <div style={{
+                                                fontSize: '24px',
+                                                fontWeight: '700',
+                                                color: 'var(--accent)',
+                                                letterSpacing: '1px'
+                                            }}>
+                                                {discount.code}
+                                            </div>
+                                            <div style={{ fontSize: '14px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                                                {discount.type === 'percentage' && `${discount.value}% off`}
+                                                {discount.type === 'fixed' && `RM${discount.value} off`}
+                                                {discount.type === 'bogo' && 'Buy 1 Get 1 Free'}
+                                            </div>
+                                            {discount.onePerUser && (
+                                                <div style={{ marginTop: '8px' }}>
+                                                    <span style={{ padding: '2px 8px', background: '#fee2e2', color: '#dc2626', fontSize: '10px', borderRadius: '4px', fontWeight: '600' }}>
+                                                        One per user
+                                                    </span>
+                                                </div>
+                                            )}
                                         </div>
-                                        <div style={{ fontSize: '14px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                                            {discount.type === 'percentage' && `${discount.value}% off`}
-                                            {discount.type === 'fixed' && `RM${discount.value} off`}
-                                            {discount.type === 'bogo' && 'Buy 1 Get 1 Free'}
-                                        </div>
+                                        <span className={`badge badge-${discount.status === 'active' ? 'success' : discount.status === 'scheduled' ? 'info' : 'warning'}`}>
+                                            {discount.status}
+                                        </span>
                                     </div>
-                                    <span className={`badge badge-${discount.status === 'active' ? 'success' : discount.status === 'scheduled' ? 'info' : 'warning'}`}>
-                                        {discount.status}
-                                    </span>
-                                </div>
 
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '16px' }}>
-                                    <div>
-                                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Min Order</div>
-                                        <div style={{ fontWeight: '600' }}>RM {discount.minOrder.toLocaleString()}</div>
-                                    </div>
-                                    <div>
-                                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Uses</div>
-                                        <div style={{ fontWeight: '600' }}>
-                                            {discount.usedCount}{discount.maxUses ? ` / ${discount.maxUses}` : ''}
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginBottom: '16px' }}>
+                                        <div>
+                                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Min Order</div>
+                                            <div style={{ fontWeight: '600' }}>RM {discount.minOrder.toLocaleString()}</div>
+                                        </div>
+                                        <div>
+                                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Uses</div>
+                                            <div style={{ fontWeight: '600' }}>
+                                                {discount.usedCount}{discount.maxUses ? ` / ${discount.maxUses}` : ''}
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Expires</div>
+                                            <div style={{ fontWeight: '600' }}>{new Date(discount.expiryDate).toLocaleDateString()}</div>
                                         </div>
                                     </div>
-                                    <div>
-                                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Expires</div>
-                                        <div style={{ fontWeight: '600' }}>{new Date(discount.expiryDate).toLocaleDateString()}</div>
-                                    </div>
-                                </div>
 
-                                <div style={{ display: 'flex', gap: '8px' }}>
-                                    <button
-                                        className="btn btn-secondary btn-sm"
-                                        style={{ flex: 1 }}
-                                        onClick={() => toggleStatus(discount.id)}
-                                    >
-                                        {discount.status === 'active' ? 'Deactivate' : 'Activate'}
-                                    </button>
-                                    <button
-                                        className="btn btn-secondary btn-icon"
-                                        onClick={() => deleteDiscount(discount.id)}
-                                        style={{ color: 'var(--danger)' }}
-                                    >
-                                        <TrashIcon />
-                                    </button>
+                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                        <button
+                                            className="btn btn-secondary btn-sm"
+                                            style={{ flex: 1 }}
+                                            onClick={() => toggleStatus(discount._id, discount.status)}
+                                        >
+                                            {discount.status === 'active' ? 'Deactivate' : 'Activate'}
+                                        </button>
+                                        <button
+                                            className="btn btn-secondary btn-icon"
+                                            onClick={() => deleteDiscount(discount._id)}
+                                            style={{ color: 'var(--danger)' }}
+                                        >
+                                            <TrashIcon />
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    ))}
-                </div>
+                        ))}
+                    </div>
+                )}
 
                 {/* Add Modal */}
                 {showModal && (
@@ -308,13 +357,32 @@ export default function DiscountsPage() {
                                             required
                                         />
                                     </div>
+
+                                    <div className="form-group">
+                                        <label style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '10px',
+                                            cursor: 'pointer',
+                                            fontSize: '14px'
+                                        }}>
+                                            <input
+                                                type="checkbox"
+                                                name="onePerUser"
+                                                checked={formData.onePerUser}
+                                                onChange={handleInputChange}
+                                                style={{ width: '18px', height: '18px' }}
+                                            />
+                                            <span>One Per User (each user can only use this code once)</span>
+                                        </label>
+                                    </div>
                                 </div>
                                 <div className="modal-footer">
                                     <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>
                                         Cancel
                                     </button>
-                                    <button type="submit" className="btn btn-primary">
-                                        Create Discount
+                                    <button type="submit" className="btn btn-primary" disabled={saving}>
+                                        {saving ? 'Creating...' : 'Create Discount'}
                                     </button>
                                 </div>
                             </form>

@@ -159,6 +159,8 @@ export default function CatalogPage() {
                 id: newCategoryName.trim().toLowerCase().replace(/\s+/g, '-'),
                 name: newCategoryName.trim(),
                 slug: newCategoryName.trim().toLowerCase().replace(/\s+/g, '-'),
+                showInNav: true,
+                order: categories.length + 1,
                 subcategories: []
             };
             if (!categories.find(c => c.id === newCat.id)) {
@@ -236,6 +238,19 @@ export default function CatalogPage() {
             if (await saveCatalog({ categories: updatedCategories })) {
                 setCategories(updatedCategories);
             }
+        }
+    };
+
+    // Toggle show in navigation
+    const handleToggleShowInNav = async (categoryId) => {
+        const updatedCategories = categories.map(cat => {
+            if (cat.id === categoryId) {
+                return { ...cat, showInNav: !cat.showInNav };
+            }
+            return cat;
+        });
+        if (await saveCatalog({ categories: updatedCategories })) {
+            setCategories(updatedCategories);
         }
     };
 
@@ -530,32 +545,76 @@ export default function CatalogPage() {
                                                 transition: 'all 0.2s'
                                             }}
                                         >
-                                            <div>
-                                                <div style={{ fontWeight: '500' }}>{category.name}</div>
+                                            <div style={{ flex: 1 }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <span style={{ fontWeight: '500' }}>{category.name}</span>
+                                                    {category.showInNav !== false && (
+                                                        <span style={{
+                                                            fontSize: '10px',
+                                                            padding: '2px 6px',
+                                                            borderRadius: '4px',
+                                                            background: selectedCategory === category.id ? 'rgba(255,255,255,0.2)' : 'var(--success)',
+                                                            color: selectedCategory === category.id ? 'white' : 'white'
+                                                        }}>NAV</span>
+                                                    )}
+                                                </div>
                                                 <div style={{
                                                     fontSize: '12px',
                                                     opacity: 0.7,
                                                     marginTop: '2px'
                                                 }}>
-                                                    {category.subcategories.length} subcategories
+                                                    {category.subcategories?.length || 0} subcategories
                                                 </div>
                                             </div>
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleDeleteCategory(category.id);
-                                                }}
-                                                disabled={saving}
-                                                style={{
-                                                    background: 'none',
-                                                    border: 'none',
-                                                    cursor: saving ? 'not-allowed' : 'pointer',
-                                                    color: selectedCategory === category.id ? 'white' : 'var(--danger)',
-                                                    padding: '4px'
-                                                }}
-                                            >
-                                                <TrashIcon />
-                                            </button>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                {/* Show in Nav Toggle */}
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleToggleShowInNav(category.id);
+                                                    }}
+                                                    disabled={saving}
+                                                    title={category.showInNav !== false ? 'Hide from navigation' : 'Show in navigation'}
+                                                    style={{
+                                                        background: category.showInNav !== false ? 'var(--success)' : 'var(--bg-main)',
+                                                        border: '1px solid ' + (category.showInNav !== false ? 'var(--success)' : 'var(--border)'),
+                                                        borderRadius: '12px',
+                                                        width: '40px',
+                                                        height: '22px',
+                                                        cursor: saving ? 'not-allowed' : 'pointer',
+                                                        position: 'relative',
+                                                        transition: 'all 0.2s'
+                                                    }}
+                                                >
+                                                    <span style={{
+                                                        position: 'absolute',
+                                                        top: '2px',
+                                                        left: category.showInNav !== false ? '20px' : '2px',
+                                                        width: '16px',
+                                                        height: '16px',
+                                                        background: 'white',
+                                                        borderRadius: '50%',
+                                                        transition: 'all 0.2s',
+                                                        boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+                                                    }} />
+                                                </button>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleDeleteCategory(category.id);
+                                                    }}
+                                                    disabled={saving}
+                                                    style={{
+                                                        background: 'none',
+                                                        border: 'none',
+                                                        cursor: saving ? 'not-allowed' : 'pointer',
+                                                        color: selectedCategory === category.id ? 'white' : 'var(--danger)',
+                                                        padding: '4px'
+                                                    }}
+                                                >
+                                                    <TrashIcon />
+                                                </button>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>

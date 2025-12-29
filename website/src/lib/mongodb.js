@@ -36,5 +36,6 @@ export const COLLECTIONS = {
     ORDERS: 'orders',
     CUSTOMERS: 'customers',
     BANNERS: 'banners',
-    DISCOUNTS: 'discounts'
+    DISCOUNTS: 'discounts',
+    SUBSCRIBERS: 'subscribers'
 };

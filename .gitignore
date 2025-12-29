@@ -1,2 +1,47 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+.next/
+out/
+build/
+dist/
+
+# Environment variables (IMPORTANT: Keep these secret!)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env.local
+
+# Firebase Service Account (NEVER commit this!)
+*firebase-adminsdk*.json
 amrin-23546-firebase-adminsdk-fbsvc-328ee65915.json
-website/.env.local
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Vercel
+.vercel
+
+# Testing
+coverage/
+
+# Misc
+*.log
+*.tsbuildinfo

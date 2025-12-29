@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Header from '@/components/Header';
 
 // Icons
@@ -23,82 +23,18 @@ const CloseIcon = () => (
     </svg>
 );
 
-// Sample orders data
-const ordersData = [
-    {
-        id: 'ORD-2024001',
-        customer: { name: 'Sarah Ahmed', email: 'sarah@email.com', phone: '+60123456781' },
-        items: [
-            { name: 'Classic White T-Shirt', size: 'M', color: 'White', qty: 2, price: 1200 },
-            { name: 'Cotton Polo Shirt', size: 'L', color: 'Navy', qty: 1, price: 1500 },
-        ],
-        total: 3900,
-        status: 'delivered',
-        paymentMethod: 'COD',
-        shippingAddress: '123 Jalan Bukit Bintang, KL 50200',
-        trackingNumber: 'TRACK123456',
-        createdAt: '2024-12-23T10:30:00',
-        updatedAt: '2024-12-23T15:45:00'
-    },
-    {
-        id: 'ORD-2024002',
-        customer: { name: 'Rahman Khan', email: 'rahman@email.com', phone: '+60123456782' },
-        items: [
-            { name: 'Denim Jacket Premium', size: 'L', color: 'Blue', qty: 1, price: 5000 },
-        ],
-        total: 5000,
-        status: 'shipped',
-        paymentMethod: 'bKash',
-        shippingAddress: '45 Jalan Ampang, KL 50450',
-        trackingNumber: 'TRACK123457',
-        createdAt: '2024-12-23T09:15:00',
-        updatedAt: '2024-12-23T14:30:00'
-    },
-    {
-        id: 'ORD-2024003',
-        customer: { name: 'Fatima Islam', email: 'fatima@email.com', phone: '+60123456783' },
-        items: [
-            { name: 'Summer Floral Dress', size: 'S', color: 'Floral', qty: 1, price: 3000 },
-            { name: 'Classic White T-Shirt', size: 'S', color: 'White', qty: 1, price: 1200 },
-        ],
-        total: 4200,
-        status: 'processing',
-        paymentMethod: 'Card',
-        shippingAddress: '78 Bangsar South, KL 59200',
-        trackingNumber: null,
-        createdAt: '2024-12-23T08:00:00',
-        updatedAt: '2024-12-23T08:00:00'
-    },
-    {
-        id: 'ORD-2024004',
-        customer: { name: 'Karim Hossain', email: 'karim@email.com', phone: '+60123456784' },
-        items: [
-            { name: 'Cotton Polo Shirt', size: 'XL', color: 'White', qty: 3, price: 1500 },
-            { name: 'Denim Jacket Premium', size: 'XL', color: 'Blue', qty: 1, price: 5000 },
-        ],
-        total: 9500,
-        status: 'pending',
-        paymentMethod: 'COD',
-        shippingAddress: '99 Mont Kiara, KL 50480',
-        trackingNumber: null,
-        createdAt: '2024-12-22T16:45:00',
-        updatedAt: '2024-12-22T16:45:00'
-    },
-    {
-        id: 'ORD-2024005',
-        customer: { name: 'Nadia Begum', email: 'nadia@email.com', phone: '+60123456785' },
-        items: [
-            { name: 'Summer Floral Dress', size: 'M', color: 'Floral', qty: 2, price: 3000 },
-        ],
-        total: 6000,
-        status: 'confirmed',
-        paymentMethod: 'Nagad',
-        shippingAddress: '55 Petaling Jaya, Selangor 47800',
-        trackingNumber: null,
-        createdAt: '2024-12-22T14:20:00',
-        updatedAt: '2024-12-22T14:35:00'
-    },
-];
+const LoadingSpinner = () => (
+    <div style={{ display: 'flex', justifyContent: 'center', padding: '60px' }}>
+        <div style={{
+            width: '40px', height: '40px',
+            border: '3px solid #f0f0f0',
+            borderTop: '3px solid var(--accent)',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite'
+        }} />
+        <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+    </div>
+);
 
 const statusColors = {
     pending: 'warning',
@@ -112,9 +48,30 @@ const statusColors = {
 const statusFlow = ['pending', 'confirmed', 'processing', 'shipped', 'delivered'];
 
 export default function OrdersPage() {
-    const [orders, setOrders] = useState(ordersData);
+    const [orders, setOrders] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [filterStatus, setFilterStatus] = useState('');
+
+    // Fetch orders from API
+    useEffect(() => {
+        fetchOrders();
+    }, []);
+
+    const fetchOrders = async () => {
+        try {
+            setLoading(true);
+            const res = await fetch('/api/orders');
+            if (res.ok) {
+                const data = await res.json();
+                setOrders(data);
+            }
+        } catch (error) {
+            console.error('Failed to fetch orders:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const filteredOrders = filterStatus
         ? orders.filter(o => o.status === filterStatus)
@@ -129,14 +86,49 @@ export default function OrdersPage() {
         });
     };
 
-    const updateOrderStatus = (orderId, newStatus) => {
-        setOrders(prev => prev.map(order =>
-            order.id === orderId
-                ? { ...order, status: newStatus, updatedAt: new Date().toISOString() }
-                : order
-        ));
-        if (selectedOrder && selectedOrder.id === orderId) {
-            setSelectedOrder(prev => ({ ...prev, status: newStatus }));
+    const updateOrderStatus = async (orderId, newStatus) => {
+        try {
+            const res = await fetch('/api/orders', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ orderId, status: newStatus })
+            });
+
+            if (res.ok) {
+                // Update local state
+                setOrders(prev => prev.map(order =>
+                    (order.orderId === orderId || order._id === orderId)
+                        ? { ...order, status: newStatus, updatedAt: new Date().toISOString() }
+                        : order
+                ));
+                if (selectedOrder && (selectedOrder.orderId === orderId || selectedOrder._id === orderId)) {
+                    setSelectedOrder(prev => ({ ...prev, status: newStatus }));
+                }
+
+                // Send shipping update email if status is shipped or delivered
+                if (newStatus === 'shipped' || newStatus === 'delivered') {
+                    const order = orders.find(o => o.orderId === orderId || o._id === orderId);
+                    if (order?.customer?.email) {
+                        try {
+                            await fetch('/api/email/shipping-update', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    email: order.customer.email,
+                                    name: order.customer.firstName || order.customer.name,
+                                    orderId: order.orderId,
+                                    status: newStatus,
+                                    trackingNumber: order.trackingNumber
+                                })
+                            });
+                        } catch (emailError) {
+                            console.error('Failed to send shipping email:', emailError);
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Failed to update order:', error);
         }
     };
 
@@ -203,18 +195,28 @@ export default function OrdersPage() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredOrders.map((order) => (
-                                    <tr key={order.id}>
-                                        <td><strong>{order.id}</strong></td>
-                                        <td>
-                                            <div>{order.customer.name}</div>
-                                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{order.customer.phone}</div>
+                                {loading ? (
+                                    <tr>
+                                        <td colSpan={8}><LoadingSpinner /></td>
+                                    </tr>
+                                ) : filteredOrders.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-secondary)' }}>
+                                            No orders found
                                         </td>
-                                        <td>{order.items.length} items</td>
-                                        <td><strong>RM {order.total.toLocaleString()}</strong></td>
+                                    </tr>
+                                ) : filteredOrders.map((order) => (
+                                    <tr key={order.orderId || order._id}>
+                                        <td><strong>{order.orderId || order._id}</strong></td>
+                                        <td>
+                                            <div>{order.customer?.name || `${order.customer?.firstName || ''} ${order.customer?.lastName || ''}`}</div>
+                                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{order.customer?.phone}</div>
+                                        </td>
+                                        <td>{order.items?.length || 0} items</td>
+                                        <td><strong>RM {(order.total || 0).toLocaleString()}</strong></td>
                                         <td>{order.paymentMethod}</td>
                                         <td>
-                                            <span className={`badge badge-${statusColors[order.status]}`}>
+                                            <span className={`badge badge-${statusColors[order.status] || 'info'}`}>
                                                 {order.status}
                                             </span>
                                         </td>
@@ -248,7 +250,7 @@ export default function OrdersPage() {
                     <div className="modal-overlay" onClick={() => setSelectedOrder(null)}>
                         <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '700px' }}>
                             <div className="modal-header">
-                                <h3 className="modal-title">Order {selectedOrder.id}</h3>
+                                <h3 className="modal-title">Order {selectedOrder.orderId || selectedOrder._id}</h3>
                                 <button className="modal-close" onClick={() => setSelectedOrder(null)}>
                                     <CloseIcon />
                                 </button>
@@ -266,7 +268,7 @@ export default function OrdersPage() {
                                         {getNextStatus(selectedOrder.status) && (
                                             <button
                                                 className="btn btn-primary btn-sm"
-                                                onClick={() => updateOrderStatus(selectedOrder.id, getNextStatus(selectedOrder.status))}
+                                                onClick={() => updateOrderStatus(selectedOrder.orderId || selectedOrder._id, getNextStatus(selectedOrder.status))}
                                             >
                                                 Mark as {getNextStatus(selectedOrder.status)}
                                             </button>
@@ -279,14 +281,18 @@ export default function OrdersPage() {
                                     <div>
                                         <h4 style={{ marginBottom: '12px', fontSize: '14px', fontWeight: '600' }}>Customer</h4>
                                         <div style={{ fontSize: '14px' }}>
-                                            <p><strong>{selectedOrder.customer.name}</strong></p>
-                                            <p style={{ color: 'var(--text-secondary)' }}>{selectedOrder.customer.email}</p>
-                                            <p style={{ color: 'var(--text-secondary)' }}>{selectedOrder.customer.phone}</p>
+                                            <p><strong>{selectedOrder.customer?.name || `${selectedOrder.customer?.firstName || ''} ${selectedOrder.customer?.lastName || ''}`}</strong></p>
+                                            <p style={{ color: 'var(--text-secondary)' }}>{selectedOrder.customer?.email}</p>
+                                            <p style={{ color: 'var(--text-secondary)' }}>{selectedOrder.customer?.phone}</p>
                                         </div>
                                     </div>
                                     <div>
                                         <h4 style={{ marginBottom: '12px', fontSize: '14px', fontWeight: '600' }}>Shipping Address</h4>
-                                        <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>{selectedOrder.shippingAddress}</p>
+                                        <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
+                                            {typeof selectedOrder.shippingAddress === 'object'
+                                                ? `${selectedOrder.shippingAddress?.address}, ${selectedOrder.shippingAddress?.city} ${selectedOrder.shippingAddress?.postcode}`
+                                                : selectedOrder.shippingAddress}
+                                        </p>
                                         {selectedOrder.trackingNumber && (
                                             <p style={{ marginTop: '8px', fontSize: '12px' }}>
                                                 <strong>Tracking:</strong> {selectedOrder.trackingNumber}
@@ -308,18 +314,18 @@ export default function OrdersPage() {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {selectedOrder.items.map((item, index) => (
+                                            {selectedOrder.items?.map((item, index) => (
                                                 <tr key={index}>
                                                     <td>{item.name}</td>
-                                                    <td>{item.size} / {item.color}</td>
-                                                    <td>{item.qty}</td>
-                                                    <td style={{ textAlign: 'right' }}>৳ {(item.price * item.qty).toLocaleString()}</td>
+                                                    <td>{item.size}{item.color ? ` / ${item.color}` : ''}</td>
+                                                    <td>{item.quantity || item.qty || 1}</td>
+                                                    <td style={{ textAlign: 'right' }}>RM {((item.price || 0) * (item.quantity || item.qty || 1)).toLocaleString()}</td>
                                                 </tr>
                                             ))}
                                             <tr>
                                                 <td colSpan={3} style={{ textAlign: 'right', fontWeight: '600' }}>Total</td>
                                                 <td style={{ textAlign: 'right', fontWeight: '700', fontSize: '16px', color: 'var(--accent)' }}>
-                                                    ৳ {selectedOrder.total.toLocaleString()}
+                                                    RM {(selectedOrder.total || 0).toLocaleString()}
                                                 </td>
                                             </tr>
                                         </tbody>

@@ -99,6 +99,25 @@ export default function AddressesPage() {
         }
     };
 
+    const setAsDefault = async (addressId) => {
+        try {
+            const res = await fetch('/api/addresses', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: user.uid, addressId, setDefault: true })
+            });
+            if (res.ok) {
+                // Update local state
+                setAddresses(addresses.map(addr => ({
+                    ...addr,
+                    isDefault: addr._id === addressId
+                })));
+            }
+        } catch (error) {
+            console.error('Failed to set default address:', error);
+        }
+    };
+
     if (authLoading || loading) {
         return (
             <>
@@ -193,17 +212,49 @@ export default function AddressesPage() {
                 ) : (
                     <div style={{ display: 'grid', gap: '16px' }}>
                         {addresses.map((addr, index) => (
-                            <div key={index} style={{ background: 'white', borderRadius: '12px', border: '1px solid var(--border)', padding: '20px' }}>
+                            <div key={index} style={{
+                                background: 'white',
+                                borderRadius: '12px',
+                                border: addr.isDefault ? '2px solid #c4a77d' : '1px solid var(--border)',
+                                padding: '20px'
+                            }}>
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                                     <div>
-                                        <span style={{ display: 'inline-block', padding: '4px 12px', background: 'var(--bg-secondary)', borderRadius: '20px', fontSize: '12px', fontWeight: '600', marginBottom: '12px' }}>{addr.label}</span>
-                                        <p style={{ fontWeight: '600', marginBottom: '4px' }}>{addr.name}</p>
+                                        <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
+                                            <span style={{ display: 'inline-block', padding: '4px 12px', background: 'var(--bg-secondary)', borderRadius: '20px', fontSize: '12px', fontWeight: '600' }}>
+                                                {addr.label || 'Address'}
+                                            </span>
+                                            {addr.isDefault && (
+                                                <span style={{ display: 'inline-block', padding: '4px 12px', background: '#c4a77d', color: 'white', borderRadius: '20px', fontSize: '11px', fontWeight: '600', textTransform: 'uppercase' }}>
+                                                    Default
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p style={{ fontWeight: '600', marginBottom: '4px' }}>{addr.name || `${addr.firstName || ''} ${addr.lastName || ''}`.trim()}</p>
                                         <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '4px' }}>{addr.phone}</p>
                                         <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>{addr.address}, {addr.city}, {addr.state} {addr.postcode}</p>
                                     </div>
-                                    <button onClick={() => deleteAddress(index)} style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', padding: '8px' }}>
-                                        <TrashIcon />
-                                    </button>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
+                                        <button onClick={() => deleteAddress(index)} style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', padding: '8px' }}>
+                                            <TrashIcon />
+                                        </button>
+                                        {!addr.isDefault && (
+                                            <button
+                                                onClick={() => setAsDefault(addr._id)}
+                                                style={{
+                                                    background: 'none',
+                                                    border: '1px solid var(--border)',
+                                                    color: 'var(--text-secondary)',
+                                                    cursor: 'pointer',
+                                                    padding: '6px 12px',
+                                                    borderRadius: '6px',
+                                                    fontSize: '12px'
+                                                }}
+                                            >
+                                                Set as Default
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         ))}

@@ -45,16 +45,35 @@ const LogoutIcon = () => (
     </svg>
 );
 
-const fabrics = ['Chiffon', 'Jersey', 'Satin', 'Modal', 'Cotton', 'Silk', 'Crepe', 'Voile'];
-
 export default function Navbar() {
-    const [hijabDropdown, setHijabDropdown] = useState(false);
+    const [categories, setCategories] = useState([]);
+    const [activeDropdown, setActiveDropdown] = useState(null);
     const [userDropdown, setUserDropdown] = useState(false);
     const { user, logout, loading: authLoading } = useAuth();
     const { itemCount } = useCart();
     const userDropdownRef = useRef(null);
 
-    // Close dropdown when clicking outside
+    // Fetch categories from API
+    useEffect(() => {
+        async function fetchCategories() {
+            try {
+                const res = await fetch('/api/catalog');
+                if (res.ok) {
+                    const data = await res.json();
+                    // Filter for showInNav and sort by order
+                    const navCategories = (data.categories || [])
+                        .filter(cat => cat.showInNav !== false)
+                        .sort((a, b) => (a.order || 0) - (b.order || 0));
+                    setCategories(navCategories);
+                }
+            } catch (error) {
+                console.error('Failed to fetch categories:', error);
+            }
+        }
+        fetchCategories();
+    }, []);
+
+    // Close user dropdown when clicking outside
     useEffect(() => {
         function handleClickOutside(event) {
             if (userDropdownRef.current && !userDropdownRef.current.contains(event.target)) {
@@ -85,36 +104,51 @@ export default function Navbar() {
                     </Link>
 
                     <div className="nav-links">
-                        {/* Hijabs with Dropdown */}
-                        <div
-                            className="nav-dropdown"
-                            onMouseEnter={() => setHijabDropdown(true)}
-                            onMouseLeave={() => setHijabDropdown(false)}
-                        >
-                            <Link href="/products?category=hijabs" className="nav-link" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                HIJABS <ChevronIcon />
-                            </Link>
-                            {hijabDropdown && (
-                                <div className="nav-dropdown-menu">
-                                    <span style={{ padding: '8px 24px', fontSize: '10px', letterSpacing: '2px', color: '#999', textTransform: 'uppercase' }}>Shop by Fabric</span>
-                                    {fabrics.map(fabric => (
-                                        <Link
-                                            key={fabric}
-                                            href={`/products?fabric=${fabric.toLowerCase()}`}
-                                            className="nav-dropdown-item"
-                                        >
-                                            {fabric}
-                                        </Link>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
+                        {/* Dynamic Categories */}
+                        {categories.map(category => (
+                            <div
+                                key={category.id}
+                                className="nav-dropdown"
+                                onMouseEnter={() => setActiveDropdown(category.id)}
+                                onMouseLeave={() => setActiveDropdown(null)}
+                            >
+                                <Link
+                                    href={`/products?category=${category.slug || category.id}`}
+                                    className="nav-link"
+                                    style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
+                                >
+                                    {category.name.toUpperCase()}
+                                    {category.subcategories && category.subcategories.length > 0 && <ChevronIcon />}
+                                </Link>
 
-                        <Link href="/products?category=scarves" className="nav-link">SCARVES</Link>
-                        <Link href="/products?category=instant" className="nav-link">INSTANT HIJABS</Link>
-                        <Link href="/products?category=underscarves" className="nav-link">UNDERSCARVES</Link>
-                        <Link href="/products?category=shawls" className="nav-link">SHAWLS</Link>
-                        <Link href="/products?category=accessories" className="nav-link">ACCESSORIES</Link>
+                                {/* Subcategory Dropdown */}
+                                {activeDropdown === category.id && category.subcategories && category.subcategories.length > 0 && (
+                                    <div className="nav-dropdown-menu">
+                                        <span style={{ padding: '8px 24px', fontSize: '10px', letterSpacing: '2px', color: '#999', textTransform: 'uppercase' }}>
+                                            Shop by Type
+                                        </span>
+                                        {category.subcategories.map(sub => (
+                                            <Link
+                                                key={sub}
+                                                href={`/products?category=${category.slug || category.id}&subcategory=${sub.toLowerCase().replace(/\s+/g, '-')}`}
+                                                className="nav-dropdown-item"
+                                            >
+                                                {sub}
+                                            </Link>
+                                        ))}
+                                        <Link
+                                            href={`/products?category=${category.slug || category.id}`}
+                                            className="nav-dropdown-item"
+                                            style={{ borderTop: '1px solid #eee', marginTop: '4px', paddingTop: '12px', fontWeight: '600' }}
+                                        >
+                                            View All {category.name}
+                                        </Link>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+
+                        {/* Sale Link */}
                         <Link href="/products?sale=true" className="nav-link sale" style={{ color: '#b74b4b' }}>SALE</Link>
                     </div>
 

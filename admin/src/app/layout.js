@@ -1,4 +1,4 @@
-import Sidebar from '@/components/Sidebar';
+import ClientLayout from '@/components/ClientLayout';
 import './globals.css';
 
 export const metadata = {
@@ -15,12 +15,7 @@ export default function RootLayout({ children }) {
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
       </head>
       <body>
-        <div className="admin-layout">
-          <Sidebar />
-          <main className="main-content">
-            {children}
-          </main>
-        </div>
+        <ClientLayout>{children}</ClientLayout>
       </body>
     </html>
   );

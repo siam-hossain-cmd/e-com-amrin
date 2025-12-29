@@ -84,3 +84,49 @@ export async function DELETE(request) {
         return Response.json({ error: 'Failed to delete address' }, { status: 500 });
     }
 }
+
+// PUT - Update address or set as default
+export async function PUT(request) {
+    try {
+        const { userId, addressId, setDefault, updates } = await request.json();
+
+        if (!userId || !addressId) {
+            return Response.json({ error: 'User ID and address ID required' }, { status: 400 });
+        }
+
+        const client = await clientPromise;
+        const db = client.db(DB_NAME);
+
+        // Get current addresses
+        const user = await db.collection('users').findOne({ firebaseUid: userId });
+        if (!user || !user.addresses) {
+            return Response.json({ error: 'User not found' }, { status: 404 });
+        }
+
+        // Update addresses
+        const updatedAddresses = user.addresses.map(addr => {
+            if (addr._id === addressId) {
+                // Apply updates and/or set as default
+                return {
+                    ...addr,
+                    ...updates,
+                    isDefault: setDefault ? true : addr.isDefault
+                };
+            } else if (setDefault) {
+                // Remove default from other addresses
+                return { ...addr, isDefault: false };
+            }
+            return addr;
+        });
+
+        await db.collection('users').updateOne(
+            { firebaseUid: userId },
+            { $set: { addresses: updatedAddresses } }
+        );
+
+        return Response.json({ success: true });
+    } catch (error) {
+        console.error('Error updating address:', error);
+        return Response.json({ error: 'Failed to update address' }, { status: 500 });
+    }
+}

@@ -83,6 +83,21 @@ const HeroIcon = () => (
     </svg>
 );
 
+const NewsletterIcon = () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+        <polyline points="22,6 12,13 2,6" />
+    </svg>
+);
+
+const AnalyticsIcon = () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <line x1="18" y1="20" x2="18" y2="10" />
+        <line x1="12" y1="20" x2="12" y2="4" />
+        <line x1="6" y1="20" x2="6" y2="14" />
+    </svg>
+);
+
 const navItems = [
     {
         section: 'Main',
@@ -100,12 +115,14 @@ const navItems = [
             { name: 'Discounts', href: '/dashboard/discounts', icon: DiscountsIcon },
             { name: 'Banners', href: '/dashboard/banners', icon: BannersIcon },
             { name: 'Hero Section', href: '/dashboard/hero', icon: HeroIcon },
+            { name: 'Newsletter', href: '/dashboard/newsletter', icon: NewsletterIcon },
             { name: 'Catalog', href: '/dashboard/catalog', icon: CatalogIcon },
         ]
     },
     {
         section: 'Settings',
         items: [
+            { name: 'Analytics', href: 'https://analytics.google.com', icon: AnalyticsIcon, external: true },
             { name: 'Settings', href: '/dashboard/settings', icon: SettingsIcon },
         ]
     }
@@ -128,7 +145,30 @@ export default function Sidebar() {
                         {section.items.map((item) => {
                             const Icon = item.icon;
                             const isActive = pathname === item.href ||
-                                (item.href !== '/dashboard' && pathname.startsWith(item.href));
+                                (item.href !== '/dashboard' && !item.external && pathname.startsWith(item.href));
+
+                            // External links open in new tab
+                            if (item.external) {
+                                return (
+                                    <a
+                                        key={item.name}
+                                        href={item.href}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="nav-item"
+                                    >
+                                        <span className="nav-item-icon">
+                                            <Icon />
+                                        </span>
+                                        <span>{item.name}</span>
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginLeft: 'auto', opacity: 0.5 }}>
+                                            <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+                                            <polyline points="15 3 21 3 21 9" />
+                                            <line x1="10" y1="14" x2="21" y2="3" />
+                                        </svg>
+                                    </a>
+                                );
+                            }
 
                             return (
                                 <Link

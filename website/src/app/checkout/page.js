@@ -32,11 +32,23 @@ export default function CheckoutPage() {
         cvv: ''
     });
 
+    // Saved addresses feature
+    const [savedAddresses, setSavedAddresses] = useState([]);
+    const [selectedAddressId, setSelectedAddressId] = useState(null);
+    const [showNewAddress, setShowNewAddress] = useState(false);
+
+    // Voucher feature
+    const [voucherCode, setVoucherCode] = useState('');
+    const [voucherLoading, setVoucherLoading] = useState(false);
+    const [appliedVoucher, setAppliedVoucher] = useState(null);
+    const [voucherError, setVoucherError] = useState('');
+
     // Use cart items from context
     const cartItems = cart.items || [];
     const subtotal = cart.total || 0;
     const shipping = subtotal >= 80 ? 0 : 5; // RM 5 shipping, free above RM 80
-    const total = subtotal + shipping;
+    const discount = appliedVoucher?.discountAmount || 0;
+    const total = subtotal + shipping - discount;
 
     // Pre-fill email if user is logged in
     useEffect(() => {
@@ -44,6 +56,56 @@ export default function CheckoutPage() {
             setShippingData(prev => ({ ...prev, email: user.email }));
         }
     }, [user]);
+
+    // Fetch saved addresses for logged-in users
+    useEffect(() => {
+        async function fetchAddresses() {
+            if (user?.uid) {
+                try {
+                    const res = await fetch(`/api/addresses?userId=${user.uid}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        setSavedAddresses(data.addresses || []);
+                        // Auto-select default address if available
+                        const defaultAddr = data.addresses?.find(a => a.isDefault);
+                        if (defaultAddr) {
+                            selectAddress(defaultAddr);
+                        } else if (data.addresses?.length > 0) {
+                            // Select first address if no default
+                            selectAddress(data.addresses[0]);
+                        } else {
+                            setShowNewAddress(true);
+                        }
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch addresses:', error);
+                    setShowNewAddress(true);
+                }
+            } else {
+                setShowNewAddress(true);
+            }
+        }
+        if (!authLoading) {
+            fetchAddresses();
+        }
+    }, [user, authLoading]);
+
+    // Select a saved address
+    const selectAddress = (addr) => {
+        setSelectedAddressId(addr._id);
+        setShippingData(prev => ({
+            ...prev,
+            firstName: addr.firstName || prev.firstName,
+            lastName: addr.lastName || prev.lastName,
+            phone: addr.phone || prev.phone,
+            address: addr.address || addr.street || '',
+            city: addr.city || '',
+            state: addr.state || '',
+            postcode: addr.postcode || addr.postalCode || '',
+            country: addr.country || 'Malaysia'
+        }));
+        setShowNewAddress(false);
+    };
 
     // Redirect if cart is empty
     useEffect(() => {
@@ -60,13 +122,181 @@ export default function CheckoutPage() {
         setCardData({ ...cardData, [e.target.name]: e.target.value });
     };
 
-    const handleSubmit = (e) => {
+    // Apply voucher code
+    const applyVoucher = async () => {
+        if (!voucherCode.trim()) return;
+
+        setVoucherLoading(true);
+        setVoucherError('');
+
+        try {
+            const res = await fetch('/api/voucher', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    code: voucherCode,
+                    userId: user?.uid || null,
+                    subtotal
+                })
+            });
+
+            const data = await res.json();
+
+            if (data.valid) {
+                setAppliedVoucher(data.voucher);
+                setVoucherError('');
+            } else {
+                setVoucherError(data.error || 'Invalid voucher');
+                setAppliedVoucher(null);
+            }
+        } catch (error) {
+            console.error('Voucher validation failed:', error);
+            setVoucherError('Failed to validate voucher');
+        } finally {
+            setVoucherLoading(false);
+        }
+    };
+
+    // Remove applied voucher
+    const removeVoucher = () => {
+        setAppliedVoucher(null);
+        setVoucherCode('');
+        setVoucherError('');
+    };
+
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const handleSubmit = async (e) => {
         e.preventDefault();
         if (step === 1) {
             setStep(2);
         } else {
-            // Process payment
-            window.location.href = '/order-confirmation';
+            // Process order
+            setIsSubmitting(true);
+            try {
+                // Create order in database
+                const orderResponse = await fetch('/api/orders', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userId: user?.uid || null,
+                        email: shippingData.email,
+                        firstName: shippingData.firstName,
+                        lastName: shippingData.lastName,
+                        phone: shippingData.phone,
+                        address: shippingData.address,
+                        city: shippingData.city,
+                        state: shippingData.state,
+                        postcode: shippingData.postcode,
+                        country: shippingData.country,
+                        items: cartItems.map(item => ({
+                            productId: item.productId,
+                            name: item.name,
+                            size: item.size,
+                            color: item.color,
+                            quantity: item.quantity,
+                            price: item.price
+                        })),
+                        subtotal,
+                        shipping,
+                        discount,
+                        total,
+                        paymentMethod,
+                        voucher: appliedVoucher ? {
+                            code: appliedVoucher.code,
+                            discountAmount: appliedVoucher.discountAmount
+                        } : null
+                    })
+                });
+
+                if (!orderResponse.ok) {
+                    throw new Error('Failed to create order');
+                }
+
+                const orderResult = await orderResponse.json();
+
+                // Send order confirmation email
+                try {
+                    await fetch('/api/email/order-confirmation', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            email: shippingData.email,
+                            name: shippingData.firstName,
+                            orderId: orderResult.orderId,
+                            orderItems: cartItems.map(item => ({
+                                name: item.name,
+                                variant: `${item.size}${item.color ? ', ' + item.color : ''}`,
+                                quantity: item.quantity,
+                                price: item.price
+                            })),
+                            total,
+                            shippingAddress: {
+                                name: `${shippingData.firstName} ${shippingData.lastName}`,
+                                address: shippingData.address,
+                                city: shippingData.city,
+                                state: shippingData.state,
+                                postcode: shippingData.postcode,
+                                phone: shippingData.phone
+                            }
+                        })
+                    });
+                } catch (emailError) {
+                    console.error('Failed to send confirmation email:', emailError);
+                }
+
+                // Save address if user requested
+                if (showNewAddress && shippingData.saveAddress && user?.uid) {
+                    try {
+                        await fetch('/api/addresses', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                userId: user.uid,
+                                address: {
+                                    firstName: shippingData.firstName,
+                                    lastName: shippingData.lastName,
+                                    phone: shippingData.phone,
+                                    address: shippingData.address,
+                                    city: shippingData.city,
+                                    state: shippingData.state,
+                                    postcode: shippingData.postcode,
+                                    country: shippingData.country,
+                                    isDefault: savedAddresses.length === 0 // Make default if first address
+                                }
+                            })
+                        });
+                    } catch (addressError) {
+                        console.error('Failed to save address:', addressError);
+                    }
+                }
+
+                // Mark voucher as used
+                if (appliedVoucher) {
+                    try {
+                        await fetch('/api/voucher', {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                code: appliedVoucher.code,
+                                userId: user?.uid || null
+                            })
+                        });
+                    } catch (voucherError) {
+                        console.error('Failed to mark voucher used:', voucherError);
+                    }
+                }
+
+                // Clear cart (if clearCart function exists in context)
+                // cart.clearCart?.();
+
+                // Redirect to confirmation with order ID
+                router.push(`/order-confirmation?orderId=${orderResult.orderId}`);
+            } catch (error) {
+                console.error('Order creation failed:', error);
+                alert('Failed to place order. Please try again.');
+                setIsSubmitting(false);
+            }
         }
     };
 
@@ -137,6 +367,102 @@ export default function CheckoutPage() {
                                         }}>
                                             Shipping Information
                                         </h2>
+
+                                        {/* Saved Addresses Selection */}
+                                        {user && savedAddresses.length > 0 && (
+                                            <div style={{ marginBottom: '24px' }}>
+                                                <label style={{ ...labelStyle, marginBottom: '12px', display: 'block' }}>
+                                                    Select Delivery Address
+                                                </label>
+                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                                    {savedAddresses.map((addr) => (
+                                                        <label
+                                                            key={addr._id}
+                                                            style={{
+                                                                display: 'flex',
+                                                                alignItems: 'flex-start',
+                                                                gap: '12px',
+                                                                padding: '16px',
+                                                                border: selectedAddressId === addr._id ? '2px solid #c4a77d' : '1px solid #e0e0e0',
+                                                                background: selectedAddressId === addr._id ? '#faf8f5' : 'white',
+                                                                cursor: 'pointer',
+                                                                borderRadius: '8px'
+                                                            }}
+                                                            onClick={() => selectAddress(addr)}
+                                                        >
+                                                            <input
+                                                                type="radio"
+                                                                name="savedAddress"
+                                                                checked={selectedAddressId === addr._id}
+                                                                onChange={() => selectAddress(addr)}
+                                                                style={{ width: '18px', height: '18px', marginTop: '2px' }}
+                                                            />
+                                                            <div style={{ flex: 1 }}>
+                                                                <div style={{ fontWeight: '500', marginBottom: '4px' }}>
+                                                                    {addr.label || `${addr.firstName || ''} ${addr.lastName || ''}`.trim() || 'Saved Address'}
+                                                                    {addr.isDefault && (
+                                                                        <span style={{
+                                                                            marginLeft: '8px',
+                                                                            padding: '2px 8px',
+                                                                            background: '#c4a77d',
+                                                                            color: 'white',
+                                                                            fontSize: '10px',
+                                                                            borderRadius: '4px',
+                                                                            textTransform: 'uppercase'
+                                                                        }}>Default</span>
+                                                                    )}
+                                                                </div>
+                                                                <div style={{ fontSize: '13px', color: '#666' }}>
+                                                                    {addr.address || addr.street}, {addr.city}, {addr.state} {addr.postcode}
+                                                                </div>
+                                                                {addr.phone && (
+                                                                    <div style={{ fontSize: '13px', color: '#999', marginTop: '4px' }}>
+                                                                        {addr.phone}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </label>
+                                                    ))}
+
+                                                    {/* Add New Address Option */}
+                                                    <label
+                                                        style={{
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '12px',
+                                                            padding: '16px',
+                                                            border: showNewAddress ? '2px solid #c4a77d' : '1px solid #e0e0e0',
+                                                            background: showNewAddress ? '#faf8f5' : 'white',
+                                                            cursor: 'pointer',
+                                                            borderRadius: '8px'
+                                                        }}
+                                                        onClick={() => {
+                                                            setShowNewAddress(true);
+                                                            setSelectedAddressId(null);
+                                                            setShippingData(prev => ({
+                                                                ...prev,
+                                                                firstName: '',
+                                                                lastName: '',
+                                                                phone: '',
+                                                                address: '',
+                                                                city: '',
+                                                                state: '',
+                                                                postcode: ''
+                                                            }));
+                                                        }}
+                                                    >
+                                                        <input
+                                                            type="radio"
+                                                            name="savedAddress"
+                                                            checked={showNewAddress}
+                                                            onChange={() => { }}
+                                                            style={{ width: '18px', height: '18px' }}
+                                                        />
+                                                        <span style={{ fontWeight: '500' }}>+ Use a New Address</span>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        )}
 
                                         <div style={{ marginBottom: '20px' }}>
                                             <label style={labelStyle}>Email Address *</label>
@@ -260,6 +586,30 @@ export default function CheckoutPage() {
                                                 />
                                             </div>
                                         </div>
+
+                                        {/* Save Address Option for New Addresses */}
+                                        {user && showNewAddress && (
+                                            <div style={{ marginBottom: '24px' }}>
+                                                <label style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '10px',
+                                                    cursor: 'pointer',
+                                                    fontSize: '14px'
+                                                }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={shippingData.saveAddress || false}
+                                                        onChange={(e) => setShippingData(prev => ({
+                                                            ...prev,
+                                                            saveAddress: e.target.checked
+                                                        }))}
+                                                        style={{ width: '18px', height: '18px' }}
+                                                    />
+                                                    Save this address for future orders
+                                                </label>
+                                            </div>
+                                        )}
 
                                         <button type="submit" style={buttonStyle}>
                                             Continue to Payment
@@ -423,12 +773,94 @@ export default function CheckoutPage() {
                                         </div>
                                     </div>
                                 ))}
+                                {/* Voucher Code Input */}
+                                <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #e8e4df' }}>
+                                    <h4 style={{ fontSize: '12px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' }}>
+                                        Have a Voucher?
+                                    </h4>
+                                    {appliedVoucher ? (
+                                        <div style={{
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            alignItems: 'center',
+                                            padding: '12px',
+                                            background: '#f0fdf4',
+                                            borderRadius: '8px',
+                                            border: '1px solid #bbf7d0'
+                                        }}>
+                                            <div>
+                                                <div style={{ fontWeight: '600', color: '#166534' }}>
+                                                    {appliedVoucher.code}
+                                                </div>
+                                                <div style={{ fontSize: '12px', color: '#166534' }}>
+                                                    -RM {appliedVoucher.discountAmount.toFixed(2)} applied
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={removeVoucher}
+                                                style={{
+                                                    background: 'none',
+                                                    border: 'none',
+                                                    color: '#dc2626',
+                                                    cursor: 'pointer',
+                                                    fontSize: '14px'
+                                                }}
+                                            >
+                                                Remove
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div style={{ display: 'flex', gap: '8px' }}>
+                                            <input
+                                                type="text"
+                                                placeholder="Enter voucher code"
+                                                value={voucherCode}
+                                                onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
+                                                style={{
+                                                    flex: 1,
+                                                    padding: '10px 12px',
+                                                    border: voucherError ? '1px solid #dc2626' : '1px solid #e0e0e0',
+                                                    borderRadius: '6px',
+                                                    fontSize: '14px',
+                                                    textTransform: 'uppercase'
+                                                }}
+                                            />
+                                            <button
+                                                onClick={applyVoucher}
+                                                disabled={voucherLoading || !voucherCode.trim()}
+                                                style={{
+                                                    padding: '10px 16px',
+                                                    background: '#1a1a1a',
+                                                    color: 'white',
+                                                    border: 'none',
+                                                    borderRadius: '6px',
+                                                    cursor: voucherLoading || !voucherCode.trim() ? 'not-allowed' : 'pointer',
+                                                    opacity: voucherLoading || !voucherCode.trim() ? 0.5 : 1,
+                                                    fontSize: '14px'
+                                                }}
+                                            >
+                                                {voucherLoading ? '...' : 'Apply'}
+                                            </button>
+                                        </div>
+                                    )}
+                                    {voucherError && (
+                                        <div style={{ color: '#dc2626', fontSize: '12px', marginTop: '8px' }}>
+                                            {voucherError}
+                                        </div>
+                                    )}
+                                </div>
 
                                 <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid #e8e4df' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', fontSize: '14px' }}>
                                         <span>Subtotal</span>
-                                        <span>RM {subtotal}</span>
+                                        <span>RM {subtotal.toFixed(2)}</span>
                                     </div>
+                                    {discount > 0 && (
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px', fontSize: '14px', color: '#166534' }}>
+                                            <span>Discount ({appliedVoucher?.code})</span>
+                                            <span>-RM {discount.toFixed(2)}</span>
+                                        </div>
+                                    )}
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', fontSize: '14px' }}>
                                         <span>Shipping</span>
                                         <span style={{ color: shipping === 0 ? '#2e7d32' : 'inherit' }}>
@@ -444,7 +876,7 @@ export default function CheckoutPage() {
                                         borderTop: '1px solid #e8e4df'
                                     }}>
                                         <span>Total</span>
-                                        <span>RM {total}</span>
+                                        <span>RM {total.toFixed(2)}</span>
                                     </div>
                                 </div>
                             </div>

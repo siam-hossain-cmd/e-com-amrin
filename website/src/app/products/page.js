@@ -1,9 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import ProductCard from '@/components/ProductCard';
+import CategoryBanner from '@/components/CategoryBanner';
+import SidebarBanner from '@/components/SidebarBanner';
 
 // Icons
 const FilterIcon = () => (
@@ -19,21 +22,18 @@ const GridIcon = () => (
     </svg>
 );
 
-// Hijab & Scarf Products
-const allProducts = [
-    { id: 1, name: 'Premium Chiffon Hijab', brand: 'Amrin Essentials', price: 45, originalPrice: 59, category: 'hijabs', material: 'Chiffon', size: ['Standard'], image: null },
-    { id: 2, name: 'Luxury Satin Silk Shawl', brand: 'Amrin Luxe', price: 89, originalPrice: null, category: 'scarves', material: 'Satin Silk', size: ['Standard'], image: null, isNew: true },
-    { id: 3, name: 'Jersey Instant Hijab', brand: 'Amrin Easy Wear', price: 35, originalPrice: 45, category: 'instant', material: 'Jersey', size: ['Standard'], image: null },
-    { id: 4, name: 'Modal Cotton Underscarf', brand: 'Amrin Basics', price: 18, originalPrice: null, category: 'underscarves', material: 'Modal', size: ['Standard'], image: null, isNew: true },
-    { id: 5, name: 'Pashmina Cashmere Scarf', brand: 'Amrin Premium', price: 120, originalPrice: 150, category: 'scarves', material: 'Cashmere', size: ['Standard'], image: null },
-    { id: 6, name: 'Pleated Chiffon Hijab', brand: 'Amrin Essentials', price: 55, originalPrice: null, category: 'hijabs', material: 'Chiffon', size: ['Standard'], image: null, isNew: true },
-    { id: 7, name: 'Printed Voile Square Scarf', brand: 'Amrin Prints', price: 42, originalPrice: 55, category: 'scarves', material: 'Voile', size: ['Standard'], image: null },
-    { id: 8, name: 'Crepe Premium Hijab', brand: 'Amrin Luxe', price: 65, originalPrice: null, category: 'hijabs', material: 'Crepe', size: ['Standard'], image: null, isNew: true },
-    { id: 9, name: 'Cotton Jersey Underscarf', brand: 'Amrin Basics', price: 15, originalPrice: 20, category: 'underscarves', material: 'Cotton Jersey', size: ['Standard'], image: null },
-    { id: 10, name: 'Bawal Satin Square', brand: 'Amrin Essentials', price: 38, originalPrice: null, category: 'hijabs', material: 'Satin', size: ['45x45', '50x50'], image: null },
-    { id: 11, name: 'Tie-Back Instant Hijab', brand: 'Amrin Easy Wear', price: 42, originalPrice: 52, category: 'instant', material: 'Jersey', size: ['Standard'], image: null },
-    { id: 12, name: 'Floral Print Chiffon Shawl', brand: 'Amrin Prints', price: 58, originalPrice: null, category: 'scarves', material: 'Chiffon', size: ['Standard'], image: null, isNew: true },
-];
+const LoadingSpinner = () => (
+    <div style={{ display: 'flex', justifyContent: 'center', padding: '60px' }}>
+        <div style={{
+            width: '40px', height: '40px',
+            border: '3px solid #f0f0f0',
+            borderTop: '3px solid #c4a77d',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite'
+        }} />
+        <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+    </div>
+);
 
 // Default catalog data (fallback)
 const defaultCategories = ['All', 'Hijabs', 'Scarves', 'Instant Hijabs', 'Underscarves'];
@@ -53,16 +53,67 @@ const sortOptions = [
     { label: 'On Sale', value: 'sale' },
 ];
 
-export default function ProductsPage() {
+function ProductsContent() {
+    const searchParams = useSearchParams();
+    const [products, setProducts] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [categories, setCategories] = useState(defaultCategories);
     const [materials, setMaterials] = useState(defaultMaterials);
     const [selectedCategory, setSelectedCategory] = useState('All');
-    const [selectedSize, setSelectedSize] = useState(null);
+    const [selectedMaterial, setSelectedMaterial] = useState(null);
     const [selectedPriceRange, setSelectedPriceRange] = useState(priceRanges[0]);
     const [sortBy, setSortBy] = useState('newest');
     const [showFilters, setShowFilters] = useState(true);
 
-    // Load dynamic catalog data from API
+    // Set initial category from URL params
+    useEffect(() => {
+        const categoryParam = searchParams.get('category');
+        if (categoryParam) {
+            // Convert slug to display name
+            const categoryMap = {
+                'hijabs': 'Hijabs',
+                'scarves': 'Scarves',
+                'instant-hijabs': 'Instant Hijabs',
+                'underscarves': 'Underscarves',
+                'shawls': 'Shawls',
+                'accessories': 'Accessories'
+            };
+            setSelectedCategory(categoryMap[categoryParam] || 'All');
+        }
+    }, [searchParams]);
+
+    // Fetch products from API
+    useEffect(() => {
+        async function fetchProducts() {
+            try {
+                setLoading(true);
+                const res = await fetch('/api/products?limit=100');
+                if (res.ok) {
+                    const data = await res.json();
+                    // Transform products to match expected format
+                    const transformed = data.map(p => ({
+                        id: p._id,
+                        name: p.name,
+                        brand: p.brand || 'Amrin',
+                        price: p.basePrice,
+                        originalPrice: p.originalPrice || null,
+                        category: (p.category || '').toLowerCase().replace(' ', '-'),
+                        material: p.fabric || '',
+                        image: p.image?.url || null,
+                        isNew: p.isNew || false
+                    }));
+                    setProducts(transformed);
+                }
+            } catch (error) {
+                console.error('Failed to fetch products:', error);
+            } finally {
+                setLoading(false);
+            }
+        }
+        fetchProducts();
+    }, []);
+
+    // Load catalog data (categories, fabrics) from API
     useEffect(() => {
         async function fetchCatalog() {
             try {
@@ -78,20 +129,23 @@ export default function ProductsPage() {
                 }
             } catch (error) {
                 console.error('Failed to fetch catalog:', error);
-                // Keep using defaults on error
             }
         }
         fetchCatalog();
     }, []);
 
     // Filter products
-    let filteredProducts = allProducts.filter(product => {
+    let filteredProducts = products.filter(product => {
         // Category filter
-        if (selectedCategory !== 'All' && product.category !== selectedCategory.toLowerCase()) {
-            return false;
+        if (selectedCategory !== 'All') {
+            const productCat = product.category.toLowerCase().replace('-', ' ');
+            const selectedCat = selectedCategory.toLowerCase();
+            if (!productCat.includes(selectedCat) && productCat !== selectedCat) {
+                return false;
+            }
         }
         // Material filter
-        if (selectedSize && product.material !== selectedSize) {
+        if (selectedMaterial && product.material !== selectedMaterial) {
             return false;
         }
         // Price filter
@@ -133,7 +187,12 @@ export default function ProductsPage() {
                 <div style={{ display: 'flex', gap: '32px' }}>
                     {/* Filters Sidebar */}
                     {showFilters && (
-                        <aside style={{ width: '240px', flexShrink: 0 }}>
+                        <aside style={{ width: '260px', flexShrink: 0 }}>
+                            {/* Sidebar Banner */}
+                            <div style={{ marginBottom: '24px' }}>
+                                <SidebarBanner />
+                            </div>
+
                             {/* Categories */}
                             <div style={{ marginBottom: '32px' }}>
                                 <h3 style={{ fontSize: '14px', fontWeight: '600', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -171,13 +230,13 @@ export default function ProductsPage() {
                                     {materials.map(material => (
                                         <button
                                             key={material}
-                                            onClick={() => setSelectedSize(selectedSize === material ? null : material)}
+                                            onClick={() => setSelectedMaterial(selectedMaterial === material ? null : material)}
                                             style={{
                                                 padding: '8px 12px',
-                                                border: selectedSize === material ? '2px solid var(--primary)' : '1px solid var(--border)',
+                                                border: selectedMaterial === material ? '2px solid var(--primary)' : '1px solid var(--border)',
                                                 borderRadius: '6px',
-                                                background: selectedSize === material ? 'var(--primary)' : 'white',
-                                                color: selectedSize === material ? 'white' : 'var(--text-primary)',
+                                                background: selectedMaterial === material ? 'var(--primary)' : 'white',
+                                                color: selectedMaterial === material ? 'white' : 'var(--text-primary)',
                                                 cursor: 'pointer',
                                                 fontSize: '12px',
                                                 fontWeight: '500',
@@ -222,7 +281,7 @@ export default function ProductsPage() {
                             <button
                                 onClick={() => {
                                     setSelectedCategory('All');
-                                    setSelectedSize(null);
+                                    setSelectedMaterial(null);
                                     setSelectedPriceRange(priceRanges[0]);
                                 }}
                                 style={{
@@ -243,6 +302,9 @@ export default function ProductsPage() {
 
                     {/* Products Grid */}
                     <div style={{ flex: 1 }}>
+                        {/* Category Banner */}
+                        <CategoryBanner />
+
                         {/* Toolbar */}
                         <div style={{
                             display: 'flex',
@@ -290,7 +352,9 @@ export default function ProductsPage() {
                         </div>
 
                         {/* Products */}
-                        {filteredProducts.length > 0 ? (
+                        {loading ? (
+                            <LoadingSpinner />
+                        ) : filteredProducts.length > 0 ? (
                             <div className="products-grid" style={{
                                 gridTemplateColumns: showFilters ? 'repeat(3, 1fr)' : 'repeat(4, 1fr)'
                             }}>
@@ -311,5 +375,34 @@ export default function ProductsPage() {
 
             <Footer />
         </>
+    );
+}
+
+// Loading fallback
+function ProductsLoading() {
+    return (
+        <>
+            <Navbar />
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '100px' }}>
+                <div style={{
+                    width: '40px', height: '40px',
+                    border: '3px solid #f0f0f0',
+                    borderTop: '3px solid #c4a77d',
+                    borderRadius: '50%',
+                    animation: 'spin 1s linear infinite'
+                }} />
+                <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+            </div>
+            <Footer />
+        </>
+    );
+}
+
+// Main export with Suspense boundary
+export default function ProductsPage() {
+    return (
+        <Suspense fallback={<ProductsLoading />}>
+            <ProductsContent />
+        </Suspense>
     );
 }

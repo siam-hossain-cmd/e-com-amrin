@@ -1,6 +1,8 @@
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import ProductCard from '@/components/ProductCard';
+import NewsletterSection from '@/components/NewsletterSection';
+import PromoBanner from '@/components/PromoBanner';
 import Link from 'next/link';
 
 // Icons
@@ -157,6 +159,7 @@ export default async function HomePage() {
   return (
     <>
       <Navbar cartCount={0} />
+      <PromoBanner />
 
       {/* Hero Section - Dynamic Content */}
       <section className="hero" style={{
@@ -282,20 +285,7 @@ export default async function HomePage() {
       </section>
 
       {/* Newsletter */}
-      <section className="section newsletter">
-        <div className="container">
-          <h2 className="newsletter-title">Join Our Newsletter</h2>
-          <p className="newsletter-text">Subscribe for exclusive offers, new arrivals, and modest fashion tips.</p>
-          <form className="newsletter-form">
-            <input
-              type="email"
-              className="newsletter-input"
-              placeholder="Enter your email"
-            />
-            <button type="submit" className="btn btn-primary">Subscribe</button>
-          </form>
-        </div>
-      </section>
+      <NewsletterSection />
 
       <Footer />
     </>
